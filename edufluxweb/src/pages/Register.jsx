@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useToast } from '../context/ToastContext'
 
 export default function Register() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -33,6 +35,7 @@ export default function Register() {
         throw new Error(errMsg)
       }
 
+      showToast('Registration completed successfully')
       setSuccess('Account created successfully! Redirecting to login...')
       
       setTimeout(() => {
