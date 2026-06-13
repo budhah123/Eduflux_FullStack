@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useToast } from '../context/ToastContext'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,6 +34,7 @@ export default function Login() {
         throw new Error(errMsg)
       }
 
+      showToast('Login completed successfully')
       setSuccess('Login successful! Redirecting to dashboard...')
       localStorage.setItem('accessToken', data.accessToken)
       localStorage.setItem('refreshToken', data.refreshToken)
