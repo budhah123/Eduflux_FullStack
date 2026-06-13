@@ -1,0 +1,36 @@
+services:
+  frontend:
+    build:
+      context: ./edufluxweb
+      dockerfile: DockerFile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://localhost:3000
+
+  backend:
+    build:
+      context: ./EduFlux_Backend
+      dockerfile: DockerFile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - DB_NAME=assignment_access_system
+      - NODE_ENV=development
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=assignment_access_system
+    volumes:
+      - mongodata:/data/db
+
+volumes:
+  mongodata:
