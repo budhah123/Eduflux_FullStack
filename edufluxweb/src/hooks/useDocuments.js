@@ -26,6 +26,7 @@ export function useDocuments(showToast) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingDocId, setEditingDocId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   // Fetch all documents from the backend
   const loadDocuments = useCallback(async () => {

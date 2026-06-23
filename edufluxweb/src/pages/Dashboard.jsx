@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import Sidebar from '../components/dashboard/Sidebar'
 import Header from '../components/dashboard/Header'
@@ -10,11 +10,15 @@ import AIChatPanel from '../components/dashboard/AIChatPanel'
 import SettingsPanel from '../components/dashboard/SettingsPanel'
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('Overview')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { showToast } = useToast()
+
+  const [activeTab, setActiveTab] = useState(() => {
+    return window.location.pathname === '/my-upload' ? 'My Uploads' : 'Overview';
+  })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  const navigate = useNavigate()
-  const { showToast } = useToast()
 
   useEffect(() => {
     const token = sessionStorage.getItem('accessToken')
@@ -23,12 +27,31 @@ export default function Dashboard() {
     }
   }, [navigate])
 
+  useEffect(() => {
+    if (location.pathname === '/my-upload') {
+      setActiveTab('My Uploads')
+    } else if (location.pathname === '/dashboard') {
+      setActiveTab(prev => prev === 'My Uploads' ? 'Overview' : prev)
+    }
+  }, [location.pathname])
+
+  const handleTabChange = (tabName) => {
+    if (tabName === 'My Uploads') {
+      navigate('/my-upload')
+    } else {
+      if (location.pathname !== '/dashboard') {
+        navigate('/dashboard')
+      }
+      setActiveTab(tabName)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-text-main flex overflow-hidden">
       {/* Sidebar navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
         onNewUploadClick={() => setUploadModalOpen(true)}
@@ -45,7 +68,7 @@ export default function Dashboard() {
         {/* Scrollable Work Canvas */}
         <main className="flex-grow overflow-y-auto custom-scrollbar bg-surface-bright pb-10">
           {activeTab === 'Overview' && (
-            <OverviewPanel setActiveTab={setActiveTab} />
+            <OverviewPanel setActiveTab={handleTabChange} />
           )}
 
           {activeTab === 'Browse' && (
