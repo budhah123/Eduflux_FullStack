@@ -36,8 +36,8 @@ export default function Login() {
 
       showToast('Login completed successfully')
       setSuccess('Login successful! Redirecting to dashboard...')
-      localStorage.setItem('accessToken', data.accessToken)
-      localStorage.setItem('refreshToken', data.refreshToken)
+      sessionStorage.setItem('accessToken', data.accessToken)
+      sessionStorage.setItem('refreshToken', data.refreshToken)
 
       setTimeout(() => {
         navigate('/dashboard')
