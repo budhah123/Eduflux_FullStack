@@ -29,4 +29,21 @@ export const documentApi = {
   getDownloadUrl: async (id) => {
     return apiClient.get(`/documents/${id}/download`);
   },
+
+  // GET /documents/:id
+  getDocument: async (id) => {
+    return apiClient.get(`/documents/${id}`);
+  },
+
+  // GET /documents
+  getAllDocuments: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    const queryString = params.toString();
+    return apiClient.get(`/documents${queryString ? `?${queryString}` : ''}`);
+  },
 };

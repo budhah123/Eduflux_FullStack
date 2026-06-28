@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+
 export default function DocumentTable({
   documents,
   loading,
@@ -9,6 +11,7 @@ export default function DocumentTable({
   onDownload,
   onDelete,
 }) {
+  const navigate = useNavigate();
   const getDocMeta = (doc) => {
     const category = doc.category || '';
     const fileUrl = doc.fileUrl || '';
@@ -99,7 +102,11 @@ export default function DocumentTable({
                         <span className="material-symbols-outlined">{meta.icon}</span>
                       </div>
                       <div>
-                        <p className="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[250px]" title={doc.title}>
+                        <p
+                          onClick={() => navigate(`/document/${doc._id}`)}
+                          className="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[250px] cursor-pointer hover:text-primary hover:underline"
+                          title={doc.title}
+                        >
                           {doc.title}
                         </p>
                         <p className="text-xs text-text-muted select-none">

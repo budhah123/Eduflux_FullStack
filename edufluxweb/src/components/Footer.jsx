@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 const footerLinks = {
   Platform: [
-    { label: 'Browse Documents', to: '/dashboard' },
+    { label: 'Browse Documents', to: '/browse-panel' },
     { label: 'AI Features',      href: '#features' },
     { label: 'Upload Guide',     href: '#' },
     { label: 'Safety Rules',     href: '#' },

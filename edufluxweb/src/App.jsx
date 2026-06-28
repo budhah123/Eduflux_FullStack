@@ -3,6 +3,7 @@ import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import DocumentViewer from './pages/DocumentViewer'
 import { ToastProvider } from './context/ToastContext'
 
 function App() {
@@ -15,6 +16,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/my-upload" element={<Dashboard />} />
+          <Route path="/browse-panel" element={<Dashboard />} />
+          <Route path="/document/:id" element={<DocumentViewer />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

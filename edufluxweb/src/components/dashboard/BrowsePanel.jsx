@@ -1,14 +1,47 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { documentApi } from '../../services/api/documentApi'
 
 export default function BrowsePanel() {
+  const navigate = useNavigate()
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [sortBy, setSortBy] = useState('Most Recent')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('All Subjects')
-  const [selectedSemester, setSelectedSemester] = useState('Fall 2023')
   const [selectedFileType, setSelectedFileType] = useState('All')
   const [bookmarkedIds, setBookmarkedIds] = useState([1, 4]) // initial bookmarked items
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [dbDocuments, setDbDocuments] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [activePreviewDoc, setActivePreviewDoc] = useState(null)
+  const [iframeLoading, setIframeLoading] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('All')
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        setLoading(true)
+        const filters = {
+          search: searchQuery,
+          subject: selectedSubject === 'All Subjects' ? '' : selectedSubject,
+          category: selectedCategory === 'All' ? '' : selectedCategory,
+        }
+        const res = await documentApi.getAllDocuments(filters)
+        setDbDocuments(res.data || [])
+      } catch (err) {
+        console.error('Error fetching public documents:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    // Use debounce or fetch on changes
+    const timer = setTimeout(() => {
+      fetchDocs()
+    }, 300)
+    
+    return () => clearTimeout(timer)
+  }, [searchQuery, selectedSubject, selectedCategory])
 
   const toggleBookmark = (id) => {
     if (bookmarkedIds.includes(id)) {
@@ -21,11 +54,44 @@ export default function BrowsePanel() {
   const resetFilters = () => {
     setSearchQuery('')
     setSelectedSubject('All Subjects')
-    setSelectedSemester('Fall 2023')
     setSelectedFileType('All')
+    setSelectedCategory('All')
   }
 
-  const documents = [
+  const handlePreviewClick = (doc) => {
+    setActivePreviewDoc(doc)
+    setIframeLoading(true)
+  }
+
+  const handleDownload = async (doc) => {
+    try {
+      if (typeof doc.id === 'number') {
+        const link = window.document.createElement('a')
+        link.href = doc.image
+        link.setAttribute('download', doc.title)
+        link.setAttribute('target', '_blank')
+        window.document.body.appendChild(link)
+        link.click()
+        link.remove()
+        return
+      }
+      
+      const res = await documentApi.getDownloadUrl(doc.id)
+      if (res && res.url) {
+        const link = window.document.createElement('a')
+        link.href = res.url
+        link.setAttribute('download', doc.title)
+        link.setAttribute('target', '_blank')
+        window.document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
+    } catch (err) {
+      console.error('Error downloading document:', err)
+    }
+  }
+
+  const MOCK_DOCUMENTS = [
     {
       id: 1,
       title: 'Advanced Quantum Mechanics: Semester I Summary',
@@ -76,6 +142,41 @@ export default function BrowsePanel() {
     }
   ]
 
+  const allDocuments = dbDocuments.map(doc => {
+        const ext = doc.fileUrl ? doc.fileUrl.split('.').pop().toUpperCase() : 'PDF';
+        const defaultThumbnails = {
+          physics: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT',
+          computer: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDq6PrARLljCtATbsHxvy93kXsIBB48nL9cXrzzh6TOXv1eSO5-Yb7ip7VlNjlufptUR0kq3c7WD5SascvuWrKjpQKXU0DZz611xkdfSg-sn03IR9iWYZy7LwAbHq_3S9FrmJad2JdGSOGKbNDVV1_s-e6jdGXTpA74d2c2vOqot1bzkZLyoEQQ3f7M1qJZSI9jUxyotr3T_RfnGoTN4CCqoKgBg0xhxlBkKdWYEYcqzNgV3nbDR9y8vOfMV3WkDFKaHlZfhHfzkMpL',
+          business: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi7u018REexJUUoi7sPCKjVe6qB3xMxvn2-4AQVmZimOuOwrR8t8tHzLrJqvBmm7XdVQ_kR5XlPcEdmg5Z0jIOk8_WyahRRbjvdCwLvXX_48pkjh95w5Udu8JFnFHrbI63oSw0dwbXNPIQ8Qi9lOw7_ZSYdURyKY9ozyeA6PAkSrZuIaXHiQvQ-V5aQkXmgg6uX2XbkOiPwJ4BlqfRsVPWdPOfDoUp5b2jfwcfVqecrKWNNtvYmY2nJIuzbwCgMGJ6MCITdgSaKgJO',
+          biology: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDCtY2n8gsyuBQxflZDXZntwL-8obvg_f2cy9z6j5yy7roifSZzuhda9Z8LLnEg_JYZV5xMwogOcDsMhJiEP8e8CeZZWwTC2ZIi-Yx81_NblKUG-kxjYQPj8LlUL0kwqlwUoTldpPr18hValShBot5E_zqsuK6e_gBVPB_LmD_dL2iBQanHkS11PVqburL5YXFOoMLoW5YBHHZxKuHDXDdNNvPvBGki6blFkJFVzi0qINuvewfJzA7_h0jeL7UfOM2-pOlUxaJLZ9tK'
+        };
+        const subjectKey = doc.subject?.toLowerCase() || '';
+        let image = defaultThumbnails.physics;
+        if (subjectKey.includes('computer') || subjectKey.includes('code') || subjectKey.includes('programming') || subjectKey.includes('algorithm')) {
+          image = defaultThumbnails.computer;
+        } else if (subjectKey.includes('business') || subjectKey.includes('manage') || subjectKey.includes('market')) {
+          image = defaultThumbnails.business;
+        } else if (subjectKey.includes('bio') || subjectKey.includes('chem') || subjectKey.includes('nature') || subjectKey.includes('medical') || subjectKey.includes('tardigrade') || subjectKey.includes('enzyme')) {
+          image = defaultThumbnails.biology;
+        }
+        return {
+          id: doc._id,
+          title: doc.title,
+          subject: doc.subject || 'General',
+          semester: doc.semester || 'N/A',
+          type: ext,
+          category: doc.category || 'Notes',
+          author: doc.uploader || 'Instructor',
+          authorAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.uploader || 'User')}&background=3525cd&color=fff`,
+          downloads: String(doc.downloadCount || 0),
+          image: image
+        };
+      });
+
+  const documents = selectedFileType === 'All'
+    ? allDocuments
+    : allDocuments.filter(doc => doc.type.toUpperCase() === selectedFileType.toUpperCase());
+
   const FilterContent = () => (
     <div className="space-y-8 select-none p-6 md:p-0">
       {/* Keywords */}
@@ -95,16 +196,18 @@ export default function BrowsePanel() {
         </div>
       </div>
 
-      {/* Category Checkboxes */}
+      {/* Category Filter */}
       <div>
         <h3 className="font-label-md text-label-md font-bold mb-4">Category</h3>
         <div className="space-y-3">
-          {['Lecture Notes', 'Past Exams', 'Research Papers', 'Textbook Solutions'].map((cat, i) => (
-            <label key={i} className="flex items-center gap-3 cursor-pointer group">
+          {['All', 'Lecture Notes', 'Past Exams', 'Research Papers', 'Textbook Solutions'].map((cat) => (
+            <label key={cat} className="flex items-center gap-3 cursor-pointer group">
               <input
-                type="checkbox"
-                defaultChecked={i === 0}
-                className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0"
+                type="radio"
+                name="category"
+                checked={selectedCategory === cat}
+                onChange={() => setSelectedCategory(cat)}
+                className="w-5 h-5 rounded-full border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
               />
               <span className="font-body-sm text-body-sm text-on-surface group-hover:text-primary transition-colors">
                 {cat}
@@ -131,28 +234,8 @@ export default function BrowsePanel() {
         </select>
       </div>
 
-      {/* Semester Tags */}
-      <div>
-        <h3 className="font-label-md text-label-md font-bold mb-4">Semester</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {['Fall 2023', 'Spring 2024', 'Fall 2024', 'Summer 2024'].map((sem, i) => {
-            const isSelected = selectedSemester === sem
-            return (
-              <button
-                key={i}
-                onClick={() => setSelectedSemester(sem)}
-                className={`py-2 px-3 border rounded-lg font-label-sm text-label-sm hover:border-primary hover:text-primary transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-primary-container text-on-primary-container border-primary font-semibold'
-                    : 'border-outline-variant text-on-surface-variant bg-white'
-                }`}
-              >
-                {sem}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+
+
 
       {/* File Type Chips */}
       <div>
@@ -279,8 +362,24 @@ export default function BrowsePanel() {
           </div>
         </div>
 
-        {/* Bento Grid layout */}
-        {viewMode === 'grid' ? (
+        {/* Bento Grid layout / List layout */}
+        {loading ? (
+          <div className="py-24 text-center select-none text-text-muted flex flex-col items-center justify-center gap-3">
+            <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="font-label-md text-label-md">Loading documents...</p>
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="py-24 text-center select-none text-text-muted">
+            <span className="material-symbols-outlined text-5xl text-outline mb-2">folder_open</span>
+            <p className="font-headline-sm text-headline-sm text-text-main font-semibold">No Documents Found</p>
+            <p className="text-body-sm text-text-muted max-w-sm mx-auto mt-1">
+              No results match your search filters or queries. Try adjusting your sidebar selections.
+            </p>
+          </div>
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
             {documents.map((doc) => {
               const isBookmarked = bookmarkedIds.includes(doc.id)
@@ -323,22 +422,22 @@ export default function BrowsePanel() {
                   {/* Body Content */}
                   <div className="p-4 flex-1 flex flex-col justify-between">
                     <div>
-                      <h4 className="font-label-md text-label-md font-bold leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                      <h4
+                        onClick={() => handlePreviewClick(doc)}
+                        className="font-label-md text-label-md font-bold leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer hover:underline"
+                      >
                         {doc.title}
                       </h4>
                       <div className="flex flex-wrap gap-1.5 mb-4 select-none">
                         <span className="px-2 py-0.5 bg-secondary-container/10 text-secondary font-label-sm text-[11px] rounded-md font-medium">
                           {doc.subject}
                         </span>
-                        <span className="px-2 py-0.5 bg-tertiary-container/10 text-tertiary font-label-sm text-[11px] rounded-md font-medium">
-                          {doc.semester}
-                        </span>
                       </div>
                     </div>
 
                     <div className="pt-4 border-t border-outline-variant flex items-center justify-between select-none">
                       <div className="flex items-center gap-2">
-                        <img alt={doc.author} className="w-6 h-6 rounded-full border border-outline-variant" src={doc.authorAvatar} />
+                        <img alt={doc.author} className="w-6 h-6 rounded-full border border-outline-variant animate-pulse-soft" src={doc.authorAvatar} />
                         <span className="text-[12px] font-label-sm text-on-surface-variant font-medium">{doc.author}</span>
                       </div>
                       <div className="flex items-center gap-1 text-on-surface-variant">
@@ -350,10 +449,16 @@ export default function BrowsePanel() {
 
                   {/* Actions footer */}
                   <div className="p-4 bg-surface-container-low flex gap-2 border-t border-outline-variant/30 select-none">
-                    <button className="flex-1 py-2 bg-white border border-outline-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-bright transition-colors cursor-pointer text-text-main shadow-sm">
+                    <button
+                      onClick={() => handlePreviewClick(doc)}
+                      className="flex-1 py-2 bg-white border border-outline-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-bright transition-colors cursor-pointer text-text-main shadow-sm"
+                    >
                       Preview
                     </button>
-                    <button className="flex-1 py-2 bg-primary text-on-primary rounded-lg font-label-sm text-label-sm shadow-sm hover:shadow hover:bg-primary-container transition-all cursor-pointer">
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      className="flex-1 py-2 bg-primary text-on-primary rounded-lg font-label-sm text-label-sm shadow-sm hover:shadow hover:bg-primary-container transition-all cursor-pointer"
+                    >
                       Download
                     </button>
                   </div>
@@ -377,8 +482,8 @@ export default function BrowsePanel() {
                         {doc.type === 'PDF' ? 'picture_as_pdf' : 'article'}
                       </span>
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="font-label-md text-label-md font-bold text-text-main group-hover:text-primary transition-colors truncate">
+                    <div className="min-w-0 cursor-pointer" onClick={() => handlePreviewClick(doc)}>
+                      <h4 className="font-label-md text-label-md font-bold text-text-main group-hover:text-primary transition-colors truncate hover:underline">
                         {doc.title}
                       </h4>
                       <p className="text-xs text-text-muted mt-1 select-none">
@@ -404,7 +509,10 @@ export default function BrowsePanel() {
                         bookmark
                       </span>
                     </button>
-                    <button className="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer">
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      className="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer"
+                    >
                       Download
                     </button>
                   </div>
@@ -415,28 +523,197 @@ export default function BrowsePanel() {
         )}
 
         {/* Pagination */}
-        <div className="mt-12 mb-8 flex items-center justify-center gap-2 select-none">
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
-            <span className="material-symbols-outlined">chevron_left</span>
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-on-primary font-bold shadow-md cursor-pointer">
-            1
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
-            2
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
-            3
-          </button>
-          <span className="px-2 text-on-surface-variant">...</span>
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
-            12
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
-            <span className="material-symbols-outlined">chevron_right</span>
-          </button>
-        </div>
+        {!loading && documents.length > 0 && (
+          <div className="mt-12 mb-8 flex items-center justify-center gap-2 select-none">
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-on-primary font-bold shadow-md cursor-pointer">
+              1
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
+              2
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
+              3
+            </button>
+            <span className="px-2 text-on-surface-variant">...</span>
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
+              12
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary transition-all cursor-pointer bg-white">
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
       </section>
+
+      {/* Modern Glassmorphic Preview Modal Popup */}
+      {activePreviewDoc && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 select-none animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-6xl h-[85vh] shadow-2xl flex flex-col overflow-hidden relative border border-outline-variant/60 animate-scale-up">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-outline-variant/60 px-6 py-4 bg-slate-50">
+              <div className="min-w-0">
+                <h3 className="font-headline-sm text-headline-sm font-bold text-text-main truncate max-w-[500px]" title={activePreviewDoc.title}>
+                  {activePreviewDoc.title}
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5 flex items-center gap-2">
+                  <span>By {activePreviewDoc.author}</span>
+                  <span>•</span>
+                  <span className="uppercase font-semibold text-[10px] text-slate-500">{activePreviewDoc.type}</span>
+                  <span>•</span>
+                  <span>{activePreviewDoc.subject}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button
+                  onClick={() => handleDownload(activePreviewDoc)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer font-medium"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  <span>Download</span>
+                </button>
+                <button
+                  onClick={() => setActivePreviewDoc(null)}
+                  className="w-10 h-10 flex items-center justify-center border border-outline-variant hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-text-main"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              {/* Preview Area */}
+              <div className="flex-grow bg-slate-900/5 p-6 flex items-center justify-center overflow-hidden h-full relative">
+                {/* Loading state for iframe */}
+                {iframeLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 z-10">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+                      <span className="text-xs text-text-muted font-medium">Loading preview...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Check if previewable */}
+                {['PDF', 'TXT', 'HTML', 'PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'SVG'].includes(activePreviewDoc.type.toUpperCase()) ? (
+                  <div className="w-full h-full bg-white rounded-xl border border-outline-variant shadow-inner overflow-hidden">
+                    {['PDF', 'TXT', 'HTML'].includes(activePreviewDoc.type.toUpperCase()) ? (
+                      <iframe
+                        src={
+                          typeof activePreviewDoc.id === 'number'
+                            ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+                            : `${BASE_URL}/documents/view/${activePreviewDoc.id}`
+                        }
+                        className="w-full h-full border-none"
+                        title={activePreviewDoc.title}
+                        onLoad={() => setIframeLoading(false)}
+                      />
+                    ) : (
+                      // Images
+                      <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                        <img
+                          src={
+                            typeof activePreviewDoc.id === 'number'
+                              ? activePreviewDoc.image
+                              : `${BASE_URL}/documents/view/${activePreviewDoc.id}`
+                          }
+                          alt={activePreviewDoc.title}
+                          className="max-w-full max-h-full object-contain rounded-lg shadow-md"
+                          onLoad={() => setIframeLoading(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Unsupported file type message
+                  <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none">
+                    <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-gold/10 text-academic-gold flex items-center justify-center mb-5">
+                      <span className="material-symbols-outlined text-3xl">draft</span>
+                    </div>
+                    <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
+                      Preview Not Supported
+                    </h4>
+                    <p className="text-body-sm text-text-muted mb-6">
+                      Direct in-browser preview is not supported for <b>.{activePreviewDoc.type.toLowerCase()}</b> files. You can download the file to view it on your device.
+                    </p>
+                    <button
+                      onClick={() => handleDownload(activePreviewDoc)}
+                      className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">download</span>
+                      <span>Download File</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Details Sidebar inside Modal */}
+              <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-outline-variant/60 p-6 overflow-y-auto bg-white flex flex-col justify-between">
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                      Metadata
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-semibold text-text-muted block">Subject</label>
+                        <span className="text-body-sm font-semibold text-text-main">{activePreviewDoc.subject}</span>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-text-muted block">Category</label>
+                        <span className="text-body-sm font-semibold text-text-main">{activePreviewDoc.category}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-outline-variant/40" />
+
+                  <div>
+                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                      Downloads
+                    </h4>
+                    <div className="flex items-center gap-2 text-text-main font-semibold text-body-md">
+                      <span className="material-symbols-outlined text-[18px] text-secondary">download</span>
+                      <span>{activePreviewDoc.downloads} times</span>
+                    </div>
+                  </div>
+
+                  <hr className="border-outline-variant/40" />
+                  
+                  <button
+                    onClick={() => {
+                      sessionStorage.setItem('chat_document_context', JSON.stringify({
+                        id: activePreviewDoc.id,
+                        title: activePreviewDoc.title,
+                      }))
+                      setActivePreviewDoc(null)
+                      navigate('/dashboard?tab=ai-chat')
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-secondary text-white rounded-lg font-label-md text-label-md shadow-sm hover:bg-secondary-container transition-all cursor-pointer font-medium"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chat</span>
+                    <span>AI Chat with this Doc</span>
+                  </button>
+                </div>
+                
+                <div className="pt-5 border-t border-outline-variant/40 mt-5 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase">
+                    {activePreviewDoc.author.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-text-muted block">Uploaded by</span>
+                    <span className="text-xs font-bold text-text-main truncate block">{activePreviewDoc.author}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

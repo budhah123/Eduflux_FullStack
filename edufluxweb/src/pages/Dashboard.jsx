@@ -15,7 +15,15 @@ export default function Dashboard() {
   const { showToast } = useToast()
 
   const [activeTab, setActiveTab] = useState(() => {
-    return window.location.pathname === '/my-upload' ? 'My Uploads' : 'Overview';
+    if (window.location.pathname === '/my-upload') return 'My Uploads';
+    if (window.location.pathname === '/browse-panel') return 'Browse';
+    // Restore tab that was stored before navigating back to /dashboard
+    const stored = sessionStorage.getItem('dashboard_pending_tab');
+    if (stored) {
+      sessionStorage.removeItem('dashboard_pending_tab');
+      return stored;
+    }
+    return 'Overview';
   })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -30,19 +38,24 @@ export default function Dashboard() {
   useEffect(() => {
     if (location.pathname === '/my-upload') {
       setActiveTab('My Uploads')
-    } else if (location.pathname === '/dashboard') {
-      setActiveTab(prev => prev === 'My Uploads' ? 'Overview' : prev)
+    } else if (location.pathname === '/browse-panel') {
+      setActiveTab('Browse')
     }
   }, [location.pathname])
 
   const handleTabChange = (tabName) => {
     if (tabName === 'My Uploads') {
       navigate('/my-upload')
+    } else if (tabName === 'Browse') {
+      navigate('/browse-panel')
     } else {
       if (location.pathname !== '/dashboard') {
+        // Store intended tab so the remounted Dashboard can restore it
+        sessionStorage.setItem('dashboard_pending_tab', tabName)
         navigate('/dashboard')
+      } else {
+        setActiveTab(tabName)
       }
-      setActiveTab(tabName)
     }
   }
 
