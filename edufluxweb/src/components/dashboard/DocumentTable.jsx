@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function DocumentTable({
@@ -10,8 +11,15 @@ export default function DocumentTable({
   onEdit,
   onDownload,
   onDelete,
+  deletingIds = [],
+  showToast,
 }) {
   const navigate = useNavigate();
+
+  const handlePreviewClick = useCallback((doc) => {
+    navigate(`/documents/${doc._id}/view`);
+  }, [navigate]);
+
   const getDocMeta = (doc) => {
     const category = doc.category || '';
     const fileUrl = doc.fileUrl || '';
@@ -102,13 +110,14 @@ export default function DocumentTable({
                         <span className="material-symbols-outlined">{meta.icon}</span>
                       </div>
                       <div>
-                        <p
-                          onClick={() => navigate(`/document/${doc._id}`)}
-                          className="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[250px] cursor-pointer hover:text-primary hover:underline"
-                          title={doc.title}
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewClick(doc)}
+                          className="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[250px] text-left cursor-pointer hover:text-primary hover:underline flex items-center gap-1.5"
+                          title={`Preview ${doc.title}`}
                         >
-                          {doc.title}
-                        </p>
+                          <span className="truncate">{doc.title}</span>
+                        </button>
                         <p className="text-xs text-text-muted select-none">
                           {meta.extLabel} • {formatFileSize(doc.fileSize)}
                         </p>
@@ -140,6 +149,13 @@ export default function DocumentTable({
                         <span className="material-symbols-outlined text-[18px]">edit</span>
                       </button>
                       <button
+                        onClick={() => handlePreviewClick(doc)}
+                        className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-secondary transition-colors cursor-pointer"
+                        title="Preview document"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">visibility</span>
+                      </button>
+                      <button
                         onClick={() => onDownload(doc._id, doc.title)}
                         className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                         title="Download document"
@@ -148,10 +164,18 @@ export default function DocumentTable({
                       </button>
                       <button
                         onClick={() => onDelete(doc._id)}
-                        className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                        className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-error transition-colors cursor-pointer flex items-center justify-center min-w-[34px] min-h-[34px]"
                         title="Delete permanently"
+                        disabled={deletingIds.includes(doc._id)}
                       >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                        {deletingIds.includes(doc._id) ? (
+                          <svg className="animate-spin h-[18px] w-[18px] text-error" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        )}
                       </button>
                     </div>
                   </td>

@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { documentApi } from '../../services/api/documentApi'
+import { useToast } from '../../context/ToastContext'
+
 
 export default function BrowsePanel() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [sortBy, setSortBy] = useState('Most Recent')
   const [searchQuery, setSearchQuery] = useState('')
@@ -13,8 +16,6 @@ export default function BrowsePanel() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [dbDocuments, setDbDocuments] = useState([])
   const [loading, setLoading] = useState(false)
-  const [activePreviewDoc, setActivePreviewDoc] = useState(null)
-  const [iframeLoading, setIframeLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('All')
 
   useEffect(() => {
@@ -58,10 +59,9 @@ export default function BrowsePanel() {
     setSelectedCategory('All')
   }
 
-  const handlePreviewClick = (doc) => {
-    setActivePreviewDoc(doc)
-    setIframeLoading(true)
-  }
+  const handlePreviewClick = useCallback((doc) => {
+    navigate(`/documents/${doc.id}/view`);
+  }, [navigate]);
 
   const handleDownload = async (doc) => {
     try {
@@ -169,7 +169,8 @@ export default function BrowsePanel() {
           author: doc.uploader || 'Instructor',
           authorAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.uploader || 'User')}&background=3525cd&color=fff`,
           downloads: String(doc.downloadCount || 0),
-          image: image
+          image: image,
+          fileUrl: doc.fileUrl
         };
       });
 
@@ -424,9 +425,9 @@ export default function BrowsePanel() {
                     <div>
                       <h4
                         onClick={() => handlePreviewClick(doc)}
-                        className="font-label-md text-label-md font-bold leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer hover:underline"
+                        className="font-label-md text-label-md font-bold leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer hover:underline flex items-center gap-1.5"
                       >
-                        {doc.title}
+                        <span className="line-clamp-2">{doc.title}</span>
                       </h4>
                       <div className="flex flex-wrap gap-1.5 mb-4 select-none">
                         <span className="px-2 py-0.5 bg-secondary-container/10 text-secondary font-label-sm text-[11px] rounded-md font-medium">
@@ -451,9 +452,9 @@ export default function BrowsePanel() {
                   <div className="p-4 bg-surface-container-low flex gap-2 border-t border-outline-variant/30 select-none">
                     <button
                       onClick={() => handlePreviewClick(doc)}
-                      className="flex-1 py-2 bg-white border border-outline-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-bright transition-colors cursor-pointer text-text-main shadow-sm"
+                      className="flex-1 py-2 bg-white border border-outline-variant rounded-lg font-label-sm text-label-sm hover:bg-surface-bright transition-colors cursor-pointer text-text-main shadow-sm flex items-center justify-center gap-1.5"
                     >
-                      Preview
+                      View
                     </button>
                     <button
                       onClick={() => handleDownload(doc)}
@@ -483,8 +484,8 @@ export default function BrowsePanel() {
                       </span>
                     </div>
                     <div className="min-w-0 cursor-pointer" onClick={() => handlePreviewClick(doc)}>
-                      <h4 className="font-label-md text-label-md font-bold text-text-main group-hover:text-primary transition-colors truncate hover:underline">
-                        {doc.title}
+                      <h4 className="font-label-md text-label-md font-bold text-text-main group-hover:text-primary transition-colors truncate hover:underline flex items-center gap-1.5">
+                        <span className="truncate">{doc.title}</span>
                       </h4>
                       <p className="text-xs text-text-muted mt-1 select-none">
                         {doc.author} • {doc.category} • {doc.type} • {doc.downloads} downloads
@@ -548,172 +549,6 @@ export default function BrowsePanel() {
         )}
       </section>
 
-      {/* Modern Glassmorphic Preview Modal Popup */}
-      {activePreviewDoc && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 select-none animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-6xl h-[85vh] shadow-2xl flex flex-col overflow-hidden relative border border-outline-variant/60 animate-scale-up">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/60 px-6 py-4 bg-slate-50">
-              <div className="min-w-0">
-                <h3 className="font-headline-sm text-headline-sm font-bold text-text-main truncate max-w-[500px]" title={activePreviewDoc.title}>
-                  {activePreviewDoc.title}
-                </h3>
-                <p className="text-xs text-text-muted mt-0.5 flex items-center gap-2">
-                  <span>By {activePreviewDoc.author}</span>
-                  <span>•</span>
-                  <span className="uppercase font-semibold text-[10px] text-slate-500">{activePreviewDoc.type}</span>
-                  <span>•</span>
-                  <span>{activePreviewDoc.subject}</span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <button
-                  onClick={() => handleDownload(activePreviewDoc)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer font-medium"
-                >
-                  <span className="material-symbols-outlined text-[18px]">download</span>
-                  <span>Download</span>
-                </button>
-                <button
-                  onClick={() => setActivePreviewDoc(null)}
-                  className="w-10 h-10 flex items-center justify-center border border-outline-variant hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-text-main"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              {/* Preview Area */}
-              <div className="flex-grow bg-slate-900/5 p-6 flex items-center justify-center overflow-hidden h-full relative">
-                {/* Loading state for iframe */}
-                {iframeLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 z-10">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-                      <span className="text-xs text-text-muted font-medium">Loading preview...</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Check if previewable */}
-                {['PDF', 'TXT', 'HTML', 'PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'SVG'].includes(activePreviewDoc.type.toUpperCase()) ? (
-                  <div className="w-full h-full bg-white rounded-xl border border-outline-variant shadow-inner overflow-hidden">
-                    {['PDF', 'TXT', 'HTML'].includes(activePreviewDoc.type.toUpperCase()) ? (
-                      <iframe
-                        src={
-                          typeof activePreviewDoc.id === 'number'
-                            ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-                            : `${BASE_URL}/documents/view/${activePreviewDoc.id}`
-                        }
-                        className="w-full h-full border-none"
-                        title={activePreviewDoc.title}
-                        onLoad={() => setIframeLoading(false)}
-                      />
-                    ) : (
-                      // Images
-                      <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
-                        <img
-                          src={
-                            typeof activePreviewDoc.id === 'number'
-                              ? activePreviewDoc.image
-                              : `${BASE_URL}/documents/view/${activePreviewDoc.id}`
-                          }
-                          alt={activePreviewDoc.title}
-                          className="max-w-full max-h-full object-contain rounded-lg shadow-md"
-                          onLoad={() => setIframeLoading(false)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Unsupported file type message
-                  <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none">
-                    <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-gold/10 text-academic-gold flex items-center justify-center mb-5">
-                      <span className="material-symbols-outlined text-3xl">draft</span>
-                    </div>
-                    <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
-                      Preview Not Supported
-                    </h4>
-                    <p className="text-body-sm text-text-muted mb-6">
-                      Direct in-browser preview is not supported for <b>.{activePreviewDoc.type.toLowerCase()}</b> files. You can download the file to view it on your device.
-                    </p>
-                    <button
-                      onClick={() => handleDownload(activePreviewDoc)}
-                      className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">download</span>
-                      <span>Download File</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Details Sidebar inside Modal */}
-              <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-outline-variant/60 p-6 overflow-y-auto bg-white flex flex-col justify-between">
-                <div className="space-y-5">
-                  <div>
-                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                      Metadata
-                    </h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] font-semibold text-text-muted block">Subject</label>
-                        <span className="text-body-sm font-semibold text-text-main">{activePreviewDoc.subject}</span>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-text-muted block">Category</label>
-                        <span className="text-body-sm font-semibold text-text-main">{activePreviewDoc.category}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <hr className="border-outline-variant/40" />
-
-                  <div>
-                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                      Downloads
-                    </h4>
-                    <div className="flex items-center gap-2 text-text-main font-semibold text-body-md">
-                      <span className="material-symbols-outlined text-[18px] text-secondary">download</span>
-                      <span>{activePreviewDoc.downloads} times</span>
-                    </div>
-                  </div>
-
-                  <hr className="border-outline-variant/40" />
-                  
-                  <button
-                    onClick={() => {
-                      sessionStorage.setItem('chat_document_context', JSON.stringify({
-                        id: activePreviewDoc.id,
-                        title: activePreviewDoc.title,
-                      }))
-                      setActivePreviewDoc(null)
-                      navigate('/dashboard?tab=ai-chat')
-                    }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-secondary text-white rounded-lg font-label-md text-label-md shadow-sm hover:bg-secondary-container transition-all cursor-pointer font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">chat</span>
-                    <span>AI Chat with this Doc</span>
-                  </button>
-                </div>
-                
-                <div className="pt-5 border-t border-outline-variant/40 mt-5 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase">
-                    {activePreviewDoc.author.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] text-text-muted block">Uploaded by</span>
-                    <span className="text-xs font-bold text-text-main truncate block">{activePreviewDoc.author}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
