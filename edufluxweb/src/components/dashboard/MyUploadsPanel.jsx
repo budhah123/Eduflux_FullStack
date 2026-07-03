@@ -88,6 +88,8 @@ export default function MyUploadsPanel({ uploadModalOpen, setUploadModalOpen, sh
           onEdit={docsState.startEdit}
           onDownload={docsState.downloadDoc}
           onDelete={docsState.deleteDoc}
+          deletingIds={docsState.deletingIds}
+          showToast={showToast}
         />
       </div>
 

@@ -17,7 +17,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/my-upload" element={<Dashboard />} />
           <Route path="/browse-panel" element={<Dashboard />} />
-          <Route path="/document/:id" element={<DocumentViewer />} />
+          <Route path="/documents/:id/view" element={<DocumentViewer />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

@@ -27,6 +27,7 @@ export function useDocuments(showToast) {
   const [editingDocId, setEditingDocId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [deletingIds, setDeletingIds] = useState([]);
 
   // Fetch all documents from the backend
   const loadDocuments = useCallback(async () => {
@@ -157,12 +158,20 @@ export function useDocuments(showToast) {
       return;
     }
 
+    setDeletingIds(prev => [...prev, id]);
     try {
-      await documentApi.deleteDocument(id);
-      if (showToast) showToast('Document deleted successfully');
-      loadDocuments();
+      const res = await documentApi.deleteDocument(id);
+      if (showToast) {
+        showToast(res?.message || 'Document deleted successfully');
+      }
+      // Remove from the list on success
+      setDocuments(prev => prev.filter(doc => doc._id !== id));
     } catch (err) {
-      if (showToast) showToast(err.message, 'error');
+      if (showToast) {
+        showToast(err.message || 'Error deleting document', 'error');
+      }
+    } finally {
+      setDeletingIds(prev => prev.filter(dId => dId !== id));
     }
   };
 
@@ -281,5 +290,6 @@ export function useDocuments(showToast) {
     startEdit,
     resetForm,
     loadDocuments,
+    deletingIds,
   };
 }
