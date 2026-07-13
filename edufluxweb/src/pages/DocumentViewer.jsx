@@ -1,56 +1,76 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useToast } from '../context/ToastContext';
-import { documentApi } from '../services/api/documentApi';
-import { useViewDocument } from '../hooks/useViewDocument';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useToast } from "../context/ToastContext";
+import { documentApi } from "../services/api/documentApi";
+import { useViewDocument } from "../hooks/useViewDocument";
+import mammoth from "mammoth/mammoth.browser";
+import { Document as PdfDocument, Page as PdfPage, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
 
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+const getSafeExtension = (fileFormat, fileUrl) => {
+  if (fileFormat) return fileFormat;
+  if (!fileUrl) return "";
+  const parts = fileUrl.split('?')[0].split('/');
+  const filename = parts[parts.length - 1];
+  const dotIndex = filename.lastIndexOf('.');
+  return dotIndex !== -1 ? filename.slice(dotIndex + 1) : "";
+};
 
 const MOCK_DOCS = {
-  "1": {
+  1: {
     _id: "1",
-    title: 'Advanced Quantum Mechanics: Semester I Summary',
-    subject: 'Physics',
-    semester: 'Sem 5',
-    fileFormat: 'pdf',
-    category: 'Lecture Notes',
-    uploader: 'Dr. Richard',
-    uploaderAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCLM8i8sfSTe6XM_LlOO5eLFT5UmEuEveU-rKnEKXHm1VgFscQVs9v10FoS0cftEU8zVWmlpA1caAb1DUcHGz7fUeoYF0R2DdJK61oKiVKqE-VOAtqf1JlmDM3gxKv5mTJs387FuTS_tjVnLIXiq4KcuNfXqQKcpksuo52AeetWbcp3jww9aPpSOaj-O1BppXBue-kl5RM99VhFFygTPtOe623USsNzNYanzkmp3kp36DOEOCbFdNSDAEgZhyUyOZm6VxvwjIFbwbVj',
+    title: "Advanced Quantum Mechanics: Semester I Summary",
+    subject: "Physics",
+    semester: "Sem 5",
+    fileFormat: "pdf",
+    category: "Lecture Notes",
+    uploader: "Dr. Richard",
+    uploaderAvatar:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCLM8i8sfSTe6XM_LlOO5eLFT5UmEuEveU-rKnEKXHm1VgFscQVs9v10FoS0cftEU8zVWmlpA1caAb1DUcHGz7fUeoYF0R2DdJK61oKiVKqE-VOAtqf1JlmDM3gxKv5mTJs387FuTS_tjVnLIXiq4KcuNfXqQKcpksuo52AeetWbcp3jww9aPpSOaj-O1BppXBue-kl5RM99VhFFygTPtOe623USsNzNYanzkmp3kp36DOEOCbFdNSDAEgZhyUyOZm6VxvwjIFbwbVj",
     downloadCount: 1200,
     fileSize: 4500000,
-    tags: ['Quantum', 'Physics', 'Mechanics'],
-    createdAt: '2026-06-03T14:42:07.589Z',
-    fileUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT'
+    tags: ["Quantum", "Physics", "Mechanics"],
+    createdAt: "2026-06-03T14:42:07.589Z",
+    fileUrl:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT",
   },
-  "2": {
+  2: {
     _id: "2",
-    title: 'Intro to Algorithms: Midterm Solutions 2023',
-    subject: 'Computer Science',
-    semester: 'Sem 3',
-    fileFormat: 'docx',
-    category: 'Past Exams',
-    uploader: 'Alan M.',
-    uploaderAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBfuubKD42NCVTdLfNQ5H8RrVa1Tq6_ZAGWTouvOZuv1sahAO5KNwc8onlEVO6m6jq0ZjHAlOc8hWa-gzvq0_rQFYIkVAfbULnap_pFF8wY76XkQ77CCZstHITllDgTYyBtwKmuMYqu2esdVy5R0iAea9t5BhW0CFakGDiW-7OONAua9jMzxsNgBkXlHqRR-gB9DlO5HZ83a_DQPzVsBgYNbeFh7xNHVOlAj3uEoQu4wsPlcf--KjLTmB_yu6OrYSDCCUf6tcR3ZRTe',
+    title: "Intro to Algorithms: Midterm Solutions 2023",
+    subject: "Computer Science",
+    semester: "Sem 3",
+    fileFormat: "docx",
+    category: "Past Exams",
+    uploader: "Alan M.",
+    uploaderAvatar:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBfuubKD42NCVTdLfNQ5H8RrVa1Tq6_ZAGWTouvOZuv1sahAO5KNwc8onlEVO6m6jq0ZjHAlOc8hWa-gzvq0_rQFYIkVAfbULnap_pFF8wY76XkQ77CCZstHITllDgTYyBtwKmuMYqu2esdVy5R0iAea9t5BhW0CFakGDiW-7OONAua9jMzxsNgBkXlHqRR-gB9DlO5HZ83a_DQPzVsBgYNbeFh7xNHVOlAj3uEoQu4wsPlcf--KjLTmB_yu6OrYSDCCUf6tcR3ZRTe",
     downloadCount: 842,
     fileSize: 2200000,
-    tags: ['Algorithms', 'Midterm', 'CS'],
-    createdAt: '2026-05-12T02:50:52.123Z',
-    fileUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDq6PrARLljCtATbsHxvy93kXsIBB48nL9cXrzzh6TOXv1eSO5-Yb7ip7VlNjlufptUR0kq3c7WD5SascvuWrKjpQKXU0DZz611xkdfSg-sn03IR9iWYZy7LwAbHq_3S9FrmJad2JdGSOGKbNDVV1_s-e6jdGXTpA74d2c2vOqot1bzkZLyoEQQ3f7M1qJZSI9jUxyotr3T_RfnGoTN4CCqoKgBg0xhxlBkKdWYEYcqzNgV3nbDR9y8vOfMV3WkDFKaHlZfhHfzkMpL'
+    tags: ["Algorithms", "Midterm", "CS"],
+    createdAt: "2026-05-12T02:50:52.123Z",
+    fileUrl:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuDq6PrARLljCtATbsHxvy93kXsIBB48nL9cXrzzh6TOXv1eSO5-Yb7ip7VlNjlufptUR0kq3c7WD5SascvuWrKjpQKXU0DZz611xkdfSg-sn03IR9iWYZy7LwAbHq_3S9FrmJad2JdGSOGKbNDVV1_s-e6jdGXTpA74d2c2vOqot1bzkZLyoEQQ3f7M1qJZSI9jUxyotr3T_RfnGoTN4CCqoKgBg0xhxlBkKdWYEYcqzNgV3nbDR9y8vOfMV3WkDFKaHlZfhHfzkMpL",
   },
-  "3": {
+  3: {
     _id: "3",
-    title: 'Market Analysis: Global Trends in EdTech 2024',
-    subject: 'Business',
-    semester: 'Graduate',
-    fileFormat: 'ppt',
-    category: 'Research Papers',
-    uploader: 'Sarah V.',
-    uploaderAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAXCxeSeyV7icp8ROkAPnrVrol0JrGvCx_rG0PWV6PlrAqGbDs_A8rMdNwdVjM7xGlTOKV34bPK5swJpEFpsIbPVM2aNDrdB_QQXfm41R66tf0smnjZoGDlpNoP-orpNB_BFoIw2docJMKMQuvnodvWXOY0q6YP0Mqdw8_VPPZ7vQN6rKyiuWDsXxe_lIOtiMVU2nfpTHTQYe-Yt9bIng-08guXs6oxIotqveAI9efMSaj5gF14w11jt41JQEKy_HZokkAXBiVpYtFA',
+    title: "Market Analysis: Global Trends in EdTech 2024",
+    subject: "Business",
+    semester: "Graduate",
+    fileFormat: "ppt",
+    category: "Research Papers",
+    uploader: "Sarah V.",
+    uploaderAvatar:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAXCxeSeyV7icp8ROkAPnrVrol0JrGvCx_rG0PWV6PlrAqGbDs_A8rMdNwdVjM7xGlTOKV34bPK5swJpEFpsIbPVM2aNDrdB_QQXfm41R66tf0smnjZoGDlpNoP-orpNB_BFoIw2docJMKMQuvnodvWXOY0q6YP0Mqdw8_VPPZ7vQN6rKyiuWDsXxe_lIOtiMVU2nfpTHTQYe-Yt9bIng-08guXs6oxIotqveAI9efMSaj5gF14w11jt41JQEKy_HZokkAXBiVpYtFA",
     downloadCount: 320,
     fileSize: 8400000,
-    tags: ['Market', 'EdTech', 'Business'],
-    createdAt: '2026-04-12T02:46:11.343Z',
-    fileUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT'
-  }
+    tags: ["Market", "EdTech", "Business"],
+    createdAt: "2026-04-12T02:46:11.343Z",
+    fileUrl:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT",
+  },
 };
 
 export default function DocumentViewer() {
@@ -64,6 +84,8 @@ export default function DocumentViewer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewHtml, setPreviewHtml] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(true);
   const [scale, setScale] = useState(1.0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -72,12 +94,38 @@ export default function DocumentViewer() {
   const [totalPages, setTotalPages] = useState(12); // Simulated total pages
   const [saved, setSaved] = useState(false);
 
+  // react-pdf Load States and Handlers
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState(null);
+
+  useEffect(() => {
+    if (previewUrl) {
+      setPdfLoading(true);
+      setPdfError(null);
+    }
+  }, [previewUrl]);
+
+  const onPdfLoadSuccess = ({ numPages }) => {
+    setTotalPages(numPages);
+    setPdfLoading(false);
+    setPdfError(null);
+  };
+
+  const onPdfLoadError = (err) => {
+    console.error("react-pdf load error:", err);
+    setPdfError("Failed to render PDF document. Please verify it is a valid PDF.");
+    setPdfLoading(false);
+  };
+
   // Related documents states
   const [relatedDocs, setRelatedDocs] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
 
   // Current session user details
-  const [currentUser, setCurrentUser] = useState({ name: 'Academic User', role: 'Researcher' });
+  const [currentUser, setCurrentUser] = useState({
+    name: "Academic User",
+    role: "Researcher",
+  });
 
   // Refs
   const previewContainerRef = useRef(null);
@@ -88,26 +136,32 @@ export default function DocumentViewer() {
 
   // Decode JWT to set user details in top nav
   useEffect(() => {
-    const token = sessionStorage.getItem('accessToken');
+    const token = sessionStorage.getItem("accessToken");
     if (token) {
       try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
         const jsonPayload = decodeURIComponent(
-          window.atob(base64)
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
+          window
+            .atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
         );
         const payload = JSON.parse(jsonPayload);
-        const name = payload.name || payload.username || (payload.email && payload.email.split('@')[0]);
-        const role = payload.role || 'Researcher';
+        const name =
+          payload.name ||
+          payload.username ||
+          (payload.email && payload.email.split("@")[0]);
+        const role = payload.role || "Researcher";
         setCurrentUser({
-          name: name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Academic User',
-          role: role.charAt(0).toUpperCase() + role.slice(1)
+          name: name
+            ? name.charAt(0).toUpperCase() + name.slice(1)
+            : "Academic User",
+          role: role.charAt(0).toUpperCase() + role.slice(1),
         });
       } catch (e) {
-        console.error('Failed to parse current user:', e);
+        console.error("Failed to parse current user:", e);
       }
     }
   }, []);
@@ -120,6 +174,8 @@ export default function DocumentViewer() {
         setError(null);
         if (MOCK_DOCS[id]) {
           setDocument(MOCK_DOCS[id]);
+          setPreviewHtml(null);
+          setPreviewError(null);
           setPreviewUrl(MOCK_DOCS[id].fileUrl);
           setPreviewLoading(false);
           setLoading(false);
@@ -129,9 +185,9 @@ export default function DocumentViewer() {
         const data = await documentApi.getDocument(id);
         setDocument(data);
       } catch (err) {
-        console.error('Error fetching document:', err);
-        setError(err.message || 'Failed to load document metadata.');
-        showToast('Failed to load document details', 'error');
+        console.error("Error fetching document:", err);
+        setError(err.message || "Failed to load document metadata.");
+        showToast("Failed to load document details", "error");
       } finally {
         if (!MOCK_DOCS[id]) {
           setLoading(false);
@@ -149,28 +205,91 @@ export default function DocumentViewer() {
   // state the callback is now stable, but we still guard with hasFetchedRef so
   // React Strict Mode's double-invoke doesn't send two network requests.
   useEffect(() => {
-    if (!id || !document || MOCK_DOCS[id]) return;  // skip for mocks
-    if (hasFetchedRef.current) return;              // already in-flight or done
+    if (!id || !document || MOCK_DOCS[id]) return; // skip for mocks
+    if (hasFetchedRef.current) return; // already in-flight or done
     hasFetchedRef.current = true;
 
     setPreviewLoading(true);
-    const fileType = (
-      document.fileFormat ||
-      document.fileUrl?.split('.').pop() ||
-      ''
-    ).toLowerCase().trim();
+    setPreviewError(null);
+    setPreviewHtml(null);
+    setPreviewUrl(null);
 
-    previewDocument(id, fileType, (url) => {
-      setPreviewUrl(url);
+    const fileType = getSafeExtension(document.fileFormat, document.fileUrl)
+      .toLowerCase()
+      .trim();
+
+    if (fileType === "docx") {
+      const fetchAndConvertWord = async () => {
+        try {
+          const res = await documentApi.getPreviewUrl(id);
+          if (!res || !res.url) {
+            throw new Error("Preview URL not found in response.");
+          }
+
+          const response = await fetch(res.url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch Word document from Cloudinary (${response.status}).`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const { value } = await mammoth.convertToHtml({ arrayBuffer });
+          setPreviewHtml(value || "");
+          setPreviewLoading(false);
+        } catch (err) {
+          console.error("Word conversion error:", err);
+          setPreviewError(
+            err.message || "Failed to convert Word document preview."
+          );
+          setPreviewLoading(false);
+        }
+      };
+
+      fetchAndConvertWord();
+      return;
+    }
+
+    if (fileType === "doc") {
+      setPreviewError("Preview not supported for legacy .doc files. Please download instead.");
       setPreviewLoading(false);
-    }, { autoRevoke: false });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      return;
+    }
+
+    previewDocument(
+      id,
+      fileType,
+      (result) => {
+        if (result?.kind === "html") {
+          setPreviewHtml(result.html || "");
+          setPreviewLoading(false);
+          return;
+        }
+
+        if (result?.kind === "url") {
+          setPreviewUrl(result.url || null);
+          setPreviewLoading(false);
+          return;
+        }
+
+        if (result?.kind === "unsupported") {
+          setPreviewError(
+            result.message || "Preview not supported for this file type.",
+          );
+          setPreviewLoading(false);
+          return;
+        }
+
+        setPreviewError("Preview not supported for this file type.");
+        setPreviewLoading(false);
+      },
+      { autoRevoke: false },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, document]); // previewDocument is stable — safe to exclude
 
   // Revoke object URL on unmount
   useEffect(() => {
     return () => {
-      if (previewUrl && !previewUrl.startsWith('http')) {
+      if (previewUrl && !previewUrl.startsWith("http")) {
         URL.revokeObjectURL(previewUrl);
       }
     };
@@ -183,24 +302,26 @@ export default function DocumentViewer() {
         setRelatedLoading(true);
         const res = await documentApi.getAllDocuments();
         const docs = res.data || [];
-        let filtered = docs.filter(d => d._id !== id);
-        
+        let filtered = docs.filter((d) => d._id !== id);
+
         if (document) {
           const subject = document.subject?.toLowerCase();
           const category = document.category?.toLowerCase();
-          filtered = filtered.filter(d => 
-            d.subject?.toLowerCase() === subject || d.category?.toLowerCase() === category
+          filtered = filtered.filter(
+            (d) =>
+              d.subject?.toLowerCase() === subject ||
+              d.category?.toLowerCase() === category,
           );
         }
-        
+
         // Populate if empty with other documents
         if (filtered.length === 0) {
-          filtered = docs.filter(d => d._id !== id);
+          filtered = docs.filter((d) => d._id !== id);
         }
-        
+
         setRelatedDocs(filtered.slice(0, 3));
       } catch (err) {
-        console.error('Error fetching related documents:', err);
+        console.error("Error fetching related documents:", err);
       } finally {
         setRelatedLoading(false);
       }
@@ -216,24 +337,30 @@ export default function DocumentViewer() {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!window.document.fullscreenElement);
     };
-    window.document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.document.addEventListener(
+      "fullscreenchange",
+      handleFullscreenChange,
+    );
     return () => {
-      window.document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreenChange,
+      );
     };
   }, []);
 
   // Format bytes to human readable file size
   const formatSize = (bytes) => {
-    if (!bytes || isNaN(bytes)) return 'Unknown size';
+    if (!bytes || isNaN(bytes)) return "Unknown size";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
+    const sizes = ["Bytes", "KB", "MB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   // Zoom handlers
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.1, 2.5));
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.5));
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 2.5));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
   const handleResetZoom = () => setScale(1.0);
 
   // Fullscreen trigger
@@ -242,17 +369,23 @@ export default function DocumentViewer() {
     if (!element) return;
 
     if (!window.document.fullscreenElement) {
-      element.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch(err => {
-        console.error('Failed to enter fullscreen:', err);
-      });
+      element
+        .requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+        })
+        .catch((err) => {
+          console.error("Failed to enter fullscreen:", err);
+        });
     } else {
-      window.document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      }).catch(err => {
-        console.error('Failed to exit fullscreen:', err);
-      });
+      window.document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+        })
+        .catch((err) => {
+          console.error("Failed to exit fullscreen:", err);
+        });
     }
   };
 
@@ -262,36 +395,40 @@ export default function DocumentViewer() {
       setDownloading(true);
       if (MOCK_DOCS[id]) {
         // Trigger mock download
-        const link = window.document.createElement('a');
+        const link = window.document.createElement("a");
         link.href = document.fileUrl;
-        link.setAttribute('download', document.title);
-        link.setAttribute('target', '_blank');
+        link.setAttribute("download", document.title);
+        link.setAttribute("target", "_blank");
         window.document.body.appendChild(link);
         link.click();
         link.remove();
-        showToast('Download started successfully (Mock)', 'success');
+        showToast("Download started successfully (Mock)", "success");
         return;
       }
 
       const res = await documentApi.getDownloadUrl(id);
       if (res && res.url) {
-        const link = window.document.createElement('a');
+        const link = window.document.createElement("a");
         link.href = res.url;
-        link.setAttribute('download', document.title);
-        link.setAttribute('target', '_blank');
+        link.setAttribute("download", document.title);
+        link.setAttribute("target", "_blank");
         window.document.body.appendChild(link);
         link.click();
         link.remove();
 
         // Increment local download count
-        setDocument(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
-        showToast('Download started successfully', 'success');
+        setDocument((prev) =>
+          prev
+            ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 }
+            : null,
+        );
+        showToast("Download started successfully", "success");
       } else {
-        throw new Error('Download URL not found in response');
+        throw new Error("Download URL not found in response");
       }
     } catch (err) {
-      console.error('Error downloading document:', err);
-      showToast(err.message || 'Failed to download document', 'error');
+      console.error("Error downloading document:", err);
+      showToast(err.message || "Failed to download document", "error");
     } finally {
       setDownloading(false);
     }
@@ -300,17 +437,17 @@ export default function DocumentViewer() {
   // Save to library handler
   const handleSaveToLibrary = () => {
     setSaved(!saved);
-    showToast(!saved ? 'Saved to library' : 'Removed from library', 'success');
+    showToast(!saved ? "Saved to library" : "Removed from library", "success");
   };
 
   // Report handler
   const handleReport = () => {
-    showToast('Report submitted for administrative review', 'success');
+    showToast("Report submitted for administrative review", "success");
   };
 
   // print handler
   const handlePrint = () => {
-    const iframe = window.document.getElementById('pdf-iframe');
+    const iframe = window.document.getElementById("pdf-iframe");
     if (iframe) {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -320,10 +457,14 @@ export default function DocumentViewer() {
   };
 
   // Check file type
-  const fileUrl = document?.fileUrl || '';
-  const extension = (document?.fileFormat || fileUrl.split('.').pop() || '').toLowerCase();
-  const isPDF = extension === 'pdf';
-  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(extension);
+  const fileUrl = document?.fileUrl || "";
+  const extension = getSafeExtension(document?.fileFormat, document?.fileUrl)
+    .toLowerCase();
+  const isPDF = extension === "pdf";
+  const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(
+    extension,
+  );
+  const isDocx = extension === "docx";
 
   if (loading) {
     return (
@@ -353,10 +494,15 @@ export default function DocumentViewer() {
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 text-text-main">
         <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-sm">
-          <span className="material-symbols-outlined text-6xl text-error mb-4">cloud_off</span>
-          <h2 className="font-display text-headline-sm font-bold mb-2">Failed to Load Document</h2>
+          <span className="material-symbols-outlined text-6xl text-error mb-4">
+            cloud_off
+          </span>
+          <h2 className="font-display text-headline-sm font-bold mb-2">
+            Failed to Load Document
+          </h2>
           <p className="text-body-sm text-text-muted mb-6">
-            {error || 'The document you are looking for could not be found or has been removed.'}
+            {error ||
+              "The document you are looking for could not be found or has been removed."}
           </p>
           <div className="flex flex-col gap-3">
             <button
@@ -383,11 +529,14 @@ export default function DocumentViewer() {
       <nav className="bg-white shadow-sm fixed top-0 left-0 w-full z-50">
         <div className="flex justify-between items-center px-margin-desktop h-16 w-full max-w-container-max mx-auto">
           {/* Logo */}
-          <div 
-            onClick={() => navigate('/dashboard')}
+          <div
+            onClick={() => navigate("/dashboard")}
             className="font-headline-sm text-headline-sm font-bold text-primary flex items-center gap-2 cursor-pointer hover:opacity-90 select-none"
           >
-            <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            <span
+              className="material-symbols-outlined text-primary text-[28px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
               auto_stories
             </span>
             <span>Eduflux</span>
@@ -396,14 +545,18 @@ export default function DocumentViewer() {
           {/* Search bar */}
           <div className="hidden md:flex flex-1 max-w-2xl mx-12">
             <div className="relative w-full">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">
+                search
+              </span>
               <input
                 className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 focus:ring-2 focus:ring-primary/20 text-body-sm transition-all outline-none"
                 placeholder="Search academic resources..."
                 type="text"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate(`/dashboard?tab=Browse&search=${encodeURIComponent(e.target.value)}`);
+                  if (e.key === "Enter") {
+                    navigate(
+                      `/dashboard?tab=Browse&search=${encodeURIComponent(e.target.value)}`,
+                    );
                   }
                 }}
               />
@@ -412,16 +565,20 @@ export default function DocumentViewer() {
 
           {/* Profile details */}
           <div className="flex items-center gap-4 select-none">
-            <button 
-              onClick={() => navigate('/dashboard?tab=Bookmarks')}
+            <button
+              onClick={() => navigate("/dashboard?tab=Bookmarks")}
               className="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-all cursor-pointer"
             >
               notifications
             </button>
             <div className="flex items-center gap-3 pl-4 border-l border-outline-variant">
               <div className="text-right hidden sm:block">
-                <p className="font-label-md text-label-md font-bold leading-none text-on-surface">{currentUser.name}</p>
-                <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold mt-1">{currentUser.role}</p>
+                <p className="font-label-md text-label-md font-bold leading-none text-on-surface">
+                  {currentUser.name}
+                </p>
+                <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold mt-1">
+                  {currentUser.role}
+                </p>
               </div>
               <img
                 className="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover"
@@ -437,17 +594,41 @@ export default function DocumentViewer() {
       <main className="pt-24 pb-12 px-margin-desktop max-w-container-max mx-auto">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 mb-8 text-label-md font-label-md text-text-muted select-none">
-          <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => navigate('/dashboard')}>Home</span>
-          <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => navigate('/dashboard?tab=Browse')}>
-            {document.category || 'Notes'}
+          <span
+            className="hover:text-primary transition-colors cursor-pointer"
+            onClick={() => navigate("/dashboard")}
+          >
+            Home
           </span>
-          <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => navigate(`/dashboard?tab=Browse&subject=${encodeURIComponent(document.subject || '')}`)}>
-            {document.subject || 'General'}
+          <span className="material-symbols-outlined text-sm">
+            chevron_right
           </span>
-          <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="text-on-surface font-bold truncate max-w-[200px]" title={document.title}>
+          <span
+            className="hover:text-primary transition-colors cursor-pointer"
+            onClick={() => navigate("/dashboard?tab=Browse")}
+          >
+            {document.category || "Notes"}
+          </span>
+          <span className="material-symbols-outlined text-sm">
+            chevron_right
+          </span>
+          <span
+            className="hover:text-primary transition-colors cursor-pointer"
+            onClick={() =>
+              navigate(
+                `/dashboard?tab=Browse&subject=${encodeURIComponent(document.subject || "")}`,
+              )
+            }
+          >
+            {document.subject || "General"}
+          </span>
+          <span className="material-symbols-outlined text-sm">
+            chevron_right
+          </span>
+          <span
+            className="text-on-surface font-bold truncate max-w-[200px]"
+            title={document.title}
+          >
             {document.title}
           </span>
         </nav>
@@ -455,30 +636,34 @@ export default function DocumentViewer() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-gutter items-start">
           {/* Left Column: Preview Panel */}
           <section className="space-y-4">
-            <div 
+            <div
               ref={previewContainerRef}
               className={`bg-white rounded-xl border border-outline-variant overflow-hidden min-h-[800px] flex flex-col relative pdf-shadow transition-all ${
-                isFullscreen ? 'fixed inset-0 z-50 w-screen h-screen rounded-none' : ''
+                isFullscreen
+                  ? "fixed inset-0 z-50 w-screen h-screen rounded-none"
+                  : ""
               }`}
             >
               {/* PDF Toolbar */}
               <div className="h-12 border-b border-outline-variant flex items-center justify-between px-6 bg-surface-container-low select-none">
                 <div className="flex items-center gap-4">
-                  <span className="text-label-sm font-label-sm text-text-muted uppercase">Page View</span>
+                  <span className="text-label-sm font-label-sm text-text-muted uppercase">
+                    Page View
+                  </span>
                   <div className="h-4 w-px bg-outline-variant"></div>
                   <span className="text-label-md font-label-md text-on-surface">
-                    {page} / {isImage ? 1 : totalPages}
+                    {page} / {isImage || isDocx ? 1 : totalPages}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button 
+                  <button
                     onClick={handlePrint}
                     className="material-symbols-outlined p-1.5 rounded hover:bg-surface-container-high transition-colors text-on-surface-variant cursor-pointer"
                     title="Print document"
                   >
                     print
                   </button>
-                  {previewUrl && (
+                  {previewUrl && !previewHtml && (
                     <a
                       href={previewUrl}
                       target="_blank"
@@ -497,7 +682,38 @@ export default function DocumentViewer() {
                 {previewLoading ? (
                   <div className="flex flex-col items-center gap-4 text-text-muted select-none">
                     <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-                    <p className="font-label-md text-label-md">Loading document viewer...</p>
+                    <p className="font-label-md text-label-md">
+                      Loading document viewer...
+                    </p>
+                  </div>
+                ) : previewError ? (
+                  <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none">
+                    <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-red/10 text-academic-red flex items-center justify-center mb-5">
+                      <span className="material-symbols-outlined text-3xl">
+                        draft
+                      </span>
+                    </div>
+                    <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
+                      Preview Not Supported
+                    </h4>
+                    <p className="text-body-sm text-text-muted mb-6">
+                      {previewError}
+                    </p>
+                    <button
+                      onClick={handleDownload}
+                      className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        download
+                      </span>
+                      <span>Download instead</span>
+                    </button>
+                  </div>
+                ) : previewHtml && isDocx ? (
+                  <div className="w-full max-w-4xl bg-white rounded-xl border border-outline-variant shadow-md overflow-hidden">
+                    <div className="prose prose-slate max-w-none p-8 md:p-10">
+                      <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                    </div>
                   </div>
                 ) : previewUrl ? (
                   isImage ? (
@@ -509,22 +725,93 @@ export default function DocumentViewer() {
                         style={{ transform: `scale(${scale})` }}
                       />
                     </div>
+                  ) : isPDF ? (
+                    <div className="w-full h-full min-h-[680px] flex flex-col items-center justify-start overflow-y-auto relative p-4">
+                      {pdfLoading && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-dim/80 z-10 text-text-muted select-none">
+                          <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4" />
+                          <span className="text-sm font-medium">Rendering PDF pages...</span>
+                        </div>
+                      )}
+                      {pdfError ? (
+                        <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none my-8">
+                          <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-red/10 text-academic-red flex items-center justify-center mb-5">
+                            <span className="material-symbols-outlined text-3xl">error</span>
+                          </div>
+                          <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
+                            PDF Rendering Failed
+                          </h4>
+                          <p className="text-body-sm text-text-muted mb-6">
+                            {pdfError}
+                          </p>
+                          <button
+                            onClick={handleDownload}
+                            className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">download</span>
+                            <span>Download instead</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <PdfDocument
+                          file={previewUrl}
+                          onLoadSuccess={onPdfLoadSuccess}
+                          onLoadError={onPdfLoadError}
+                          loading={null}
+                          className="flex flex-col items-center justify-center"
+                        >
+                          <div className="bg-white p-4 rounded-xl border border-outline-variant/60 shadow-md">
+                            <PdfPage
+                              pageNumber={page}
+                              scale={scale}
+                              loading={
+                                <div className="w-full h-[600px] flex items-center justify-center bg-slate-50 rounded">
+                                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                </div>
+                              }
+                            />
+                          </div>
+                        </PdfDocument>
+                      )}
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center min-h-[680px]">
-                      <iframe
-                        id="pdf-iframe"
-                        src={previewUrl}
-                        title={document.title}
-                        className="w-full h-full min-h-[680px] border-0 rounded shadow-md transition-transform duration-200"
-                        style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
-                      />
+                    <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none mx-4">
+                      <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-gold/10 text-academic-gold flex items-center justify-center mb-5">
+                        <span className="material-symbols-outlined text-3xl">
+                          draft
+                        </span>
+                      </div>
+                      <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
+                        Preview Not Supported
+                      </h4>
+                      <p className="text-body-sm text-text-muted mb-6">
+                        In-browser preview is not available for{" "}
+                        <b>{extension ? `.${extension}` : "this type of"}</b>{" "}
+                        files. Download the file to view it on your device.
+                      </p>
+                      <button
+                        onClick={handleDownload}
+                        className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          download
+                        </span>
+                        <span>Download File</span>
+                      </button>
                     </div>
                   )
                 ) : (
                   <div className="flex flex-col items-center justify-center text-text-muted p-8 text-center select-none">
-                    <span className="material-symbols-outlined text-5xl mb-3 text-outline">draft</span>
-                    <p className="font-bold text-headline-sm">Preview Unavailable</p>
-                    <p className="text-body-sm max-w-xs mt-1">This file type cannot be previewed. Please download the file to view its content.</p>
+                    <span className="material-symbols-outlined text-5xl mb-3 text-outline">
+                      draft
+                    </span>
+                    <p className="font-bold text-headline-sm">
+                      Preview Unavailable
+                    </p>
+                    <p className="text-body-sm max-w-xs mt-1">
+                      This file type cannot be previewed. Please download the
+                      file to view its content.
+                    </p>
                   </div>
                 )}
               </div>
@@ -534,21 +821,27 @@ export default function DocumentViewer() {
                 {/* Page Navigation */}
                 <div className="flex items-center gap-2">
                   <button
-                    disabled={page <= 1 || isImage}
-                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                    disabled={page <= 1 || isImage || isDocx}
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all active:scale-95 text-on-surface disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    <span className="material-symbols-outlined">chevron_left</span>
+                    <span className="material-symbols-outlined">
+                      chevron_left
+                    </span>
                   </button>
                   <span className="text-label-md font-bold px-2 whitespace-nowrap">
-                    Page {page} of {isImage ? 1 : totalPages}
+                    Page {page} of {isImage || isDocx ? 1 : totalPages}
                   </span>
                   <button
-                    disabled={page >= totalPages || isImage}
-                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={page >= totalPages || isImage || isDocx}
+                    onClick={() =>
+                      setPage((prev) => Math.min(prev + 1, totalPages))
+                    }
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all active:scale-95 text-on-surface disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    <span className="material-symbols-outlined">chevron_right</span>
+                    <span className="material-symbols-outlined">
+                      chevron_right
+                    </span>
                   </button>
                 </div>
 
@@ -563,7 +856,7 @@ export default function DocumentViewer() {
                   >
                     zoom_out
                   </button>
-                  <span 
+                  <span
                     onClick={handleResetZoom}
                     className="text-label-md font-medium min-w-[3rem] text-center cursor-pointer hover:text-primary"
                     title="Reset Zoom"
@@ -587,7 +880,7 @@ export default function DocumentViewer() {
                   className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                   title="Toggle Fullscreen"
                 >
-                  {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                  {isFullscreen ? "fullscreen_exit" : "fullscreen"}
                 </button>
               </div>
             </div>
@@ -606,15 +899,20 @@ export default function DocumentViewer() {
               <div className="flex items-center gap-3 mb-6 p-3 bg-bg-subtle rounded-lg">
                 <img
                   className="w-12 h-12 rounded-full object-cover border border-outline-variant"
-                  src={document.uploaderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(document.uploader || 'User')}&background=3525cd&color=fff`}
-                  alt={document.uploader || 'Uploader'}
+                  src={
+                    document.uploaderAvatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(document.uploader || "User")}&background=3525cd&color=fff`
+                  }
+                  alt={document.uploader || "Uploader"}
                 />
                 <div>
                   <p className="text-label-md font-bold text-on-surface leading-tight">
-                    {document.uploader || 'System User'}
+                    {document.uploader || "System User"}
                   </p>
                   <p className="text-label-sm text-text-muted mt-1">
-                    {document.userId ? 'Uploader / Academic' : 'AI Academic Manager'}
+                    {document.userId
+                      ? "Uploader / Academic"
+                      : "AI Academic Manager"}
                   </p>
                 </div>
               </div>
@@ -622,22 +920,31 @@ export default function DocumentViewer() {
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-8">
                 <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-label-sm font-bold">
-                  {document.category || 'Notes'}
+                  {document.category || "Notes"}
                 </span>
                 {document.subject && (
                   <span className="px-3 py-1 bg-secondary/10 text-secondary rounded-full text-label-sm font-bold">
                     {document.subject}
                   </span>
                 )}
-                {Array.isArray(document.tags) && document.tags.map((tag, idx) => (
-                  <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-label-sm font-bold">
-                    {tag.trim()}
-                  </span>
-                )) || typeof document.tags === 'string' && document.tags.split(',').map((tag, idx) => (
-                  <span key={idx} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-label-sm font-bold">
-                    {tag.trim()}
-                  </span>
-                ))}
+                {(Array.isArray(document.tags) &&
+                  document.tags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-label-sm font-bold"
+                    >
+                      {tag.trim()}
+                    </span>
+                  ))) ||
+                  (typeof document.tags === "string" &&
+                    document.tags.split(",").map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-label-sm font-bold"
+                      >
+                        {tag.trim()}
+                      </span>
+                    )))}
               </div>
 
               {/* Stats */}
@@ -668,22 +975,27 @@ export default function DocumentViewer() {
                   className="w-full bg-primary text-on-primary py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all active:scale-[0.98] shadow-md disabled:opacity-50 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[20px]">
-                    {downloading ? 'sync' : 'download'}
+                    {downloading ? "sync" : "download"}
                   </span>
-                  <span>{downloading ? 'Downloading...' : 'Download File'}</span>
+                  <span>
+                    {downloading ? "Downloading..." : "Download File"}
+                  </span>
                 </button>
                 <button
                   onClick={handleSaveToLibrary}
                   className={`w-full border py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    saved 
-                      ? 'border-emerald-600 text-emerald-600 bg-emerald-50' 
-                      : 'border-primary text-primary hover:bg-primary/5'
+                    saved
+                      ? "border-emerald-600 text-emerald-600 bg-emerald-50"
+                      : "border-primary text-primary hover:bg-primary/5"
                   }`}
                 >
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: `'FILL' ${saved ? 1 : 0}` }}>
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontVariationSettings: `'FILL' ${saved ? 1 : 0}` }}
+                  >
                     bookmark
                   </span>
-                  <span>{saved ? 'Saved in Library' : 'Save to Library'}</span>
+                  <span>{saved ? "Saved in Library" : "Save to Library"}</span>
                 </button>
               </div>
 
@@ -692,7 +1004,9 @@ export default function DocumentViewer() {
                 onClick={handleReport}
                 className="w-full text-center text-label-sm text-text-muted mt-6 hover:text-academic-red transition-colors flex items-center justify-center gap-1 font-medium cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">report</span>
+                <span className="material-symbols-outlined text-[16px]">
+                  report
+                </span>
                 <span>Report Document</span>
               </button>
             </div>
@@ -711,7 +1025,9 @@ export default function DocumentViewer() {
               ) : relatedDocs.length > 0 ? (
                 <div className="space-y-3">
                   {relatedDocs.map((doc) => {
-                    const isPdfDoc = (doc.fileFormat || doc.fileUrl?.split('.').pop() || '').toLowerCase() === 'pdf';
+                    const isPdfDoc =
+                      getSafeExtension(doc.fileFormat, doc.fileUrl)
+                        .toLowerCase() === "pdf";
                     return (
                       <div
                         key={doc._id}
@@ -720,7 +1036,7 @@ export default function DocumentViewer() {
                       >
                         <div className="w-16 h-20 bg-surface-container-low rounded flex items-center justify-center text-primary group-hover:scale-105 transition-transform flex-shrink-0">
                           <span className="material-symbols-outlined text-4xl">
-                            {isPdfDoc ? 'description' : 'terminal'}
+                            {isPdfDoc ? "description" : "terminal"}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -728,10 +1044,16 @@ export default function DocumentViewer() {
                             {doc.title}
                           </h4>
                           <p className="text-label-sm text-text-muted mt-1 truncate">
-                            {doc.category || 'Notes'} • {formatSize(doc.fileSize)}
+                            {doc.category || "Notes"} •{" "}
+                            {formatSize(doc.fileSize)}
                           </p>
                           <div className="flex items-center gap-1 mt-2 text-academic-gold">
-                            <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                            <span
+                              className="material-symbols-outlined text-[14px]"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              star
+                            </span>
                             <span className="text-label-sm font-bold">4.8</span>
                           </div>
                         </div>
@@ -740,7 +1062,9 @@ export default function DocumentViewer() {
                   })}
                 </div>
               ) : (
-                <p className="text-body-sm text-text-muted italic text-center p-4">No related documents found</p>
+                <p className="text-body-sm text-text-muted italic text-center p-4">
+                  No related documents found
+                </p>
               )}
             </div>
           </aside>

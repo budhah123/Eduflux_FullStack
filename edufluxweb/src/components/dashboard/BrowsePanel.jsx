@@ -143,7 +143,15 @@ export default function BrowsePanel() {
   ]
 
   const allDocuments = dbDocuments.map(doc => {
-        const ext = doc.fileUrl ? doc.fileUrl.split('.').pop().toUpperCase() : 'PDF';
+        let ext = (doc.fileFormat || '').toUpperCase();
+        if (!ext && doc.fileUrl) {
+          const parts = doc.fileUrl.split('?')[0].split('/');
+          const filename = parts[parts.length - 1];
+          const dotIndex = filename.lastIndexOf('.');
+          ext = dotIndex !== -1 ? filename.slice(dotIndex + 1).toUpperCase() : 'PDF';
+        }
+        if (!ext) ext = 'PDF';
+
         const defaultThumbnails = {
           physics: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT',
           computer: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDq6PrARLljCtATbsHxvy93kXsIBB48nL9cXrzzh6TOXv1eSO5-Yb7ip7VlNjlufptUR0kq3c7WD5SascvuWrKjpQKXU0DZz611xkdfSg-sn03IR9iWYZy7LwAbHq_3S9FrmJad2JdGSOGKbNDVV1_s-e6jdGXTpA74d2c2vOqot1bzkZLyoEQQ3f7M1qJZSI9jUxyotr3T_RfnGoTN4CCqoKgBg0xhxlBkKdWYEYcqzNgV3nbDR9y8vOfMV3WkDFKaHlZfhHfzkMpL',
@@ -170,7 +178,8 @@ export default function BrowsePanel() {
           authorAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.uploader || 'User')}&background=3525cd&color=fff`,
           downloads: String(doc.downloadCount || 0),
           image: image,
-          fileUrl: doc.fileUrl
+          fileUrl: doc.fileUrl,
+          fileSize: doc.fileSize
         };
       });
 
