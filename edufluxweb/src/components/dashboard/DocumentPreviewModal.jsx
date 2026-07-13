@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useToast } from '../../context/ToastContext';
-import { useViewDocument } from '../../hooks/useViewDocument';
-import DocumentPreview from './DocumentPreview';
+import { useState, useEffect } from "react";
+import { useToast } from "../../context/ToastContext";
+import { useViewDocument } from "../../hooks/useViewDocument";
+import DocumentPreview from "./DocumentPreview";
+
+const getSafeExtension = (fileType, fileFormat, fileUrl) => {
+  if (fileType) return fileType;
+  if (fileFormat) return fileFormat;
+  if (!fileUrl) return "";
+  const parts = fileUrl.split('?')[0].split('/');
+  const filename = parts[parts.length - 1];
+  const dotIndex = filename.lastIndexOf('.');
+  return dotIndex !== -1 ? filename.slice(dotIndex + 1) : "";
+};
 
 /**
  * DocumentPreviewModal
@@ -33,23 +43,25 @@ export default function DocumentPreviewModal({
   const { previewDocument } = useViewDocument(showToast);
 
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewHtml, setPreviewHtml] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
   // Prevent body scroll while modal is open
   useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : '';
+    document.body.style.overflow = isOpen ? "hidden" : "";
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
 
@@ -57,19 +69,31 @@ export default function DocumentPreviewModal({
   useEffect(() => {
     if (!isOpen || !doc) {
       setPreviewUrl(null);
+      setPreviewHtml(null);
+      setPreviewError(null);
       setPreviewLoading(false);
       return;
     }
 
     // Mock documents get loaded directly
-    const isMock = doc._id?.startsWith('mock') || ['1', '2', '3'].includes(doc._id);
+    const isMock =
+      doc._id?.startsWith("mock") || ["1", "2", "3"].includes(doc._id);
     if (isMock) {
       // Resolve mock Office docs conversion url if needed
-      const ext = (fileType || doc.fileFormat || doc.fileUrl?.split('.').pop() || '').toLowerCase().trim();
-      const isOfficeType = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+      const ext = getSafeExtension(fileType, doc.fileFormat, doc.fileUrl)
+        .toLowerCase()
+        .trim();
+      const isOfficeType = [
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+      ].includes(ext);
       let url = doc.fileUrl;
       if (isOfficeType && url) {
-        url = url.replace('/raw/upload/', '/image/upload/') + '.pdf';
+        url = url.replace("/raw/upload/", "/image/upload/") + ".pdf";
       }
       setPreviewUrl(url);
       setPreviewLoading(false);
@@ -77,34 +101,70 @@ export default function DocumentPreviewModal({
     }
 
     setPreviewLoading(true);
-    const ext = (fileType || doc.fileFormat || doc.fileUrl?.split('.').pop() || '').toLowerCase().trim();
+    setPreviewError(null);
+    setPreviewHtml(null);
+    setPreviewUrl(null);
 
-    previewDocument(doc._id, ext, (objectUrl) => {
-      setPreviewUrl(objectUrl);
-      setPreviewLoading(false);
-    }, { autoRevoke: true }); // Modal automatically revokes URL after 60s to save memory
+    const ext = getSafeExtension(fileType, doc.fileFormat, doc.fileUrl)
+      .toLowerCase()
+      .trim();
 
+    previewDocument(
+      doc._id,
+      ext,
+      (result) => {
+        if (result?.kind === "html") {
+          setPreviewHtml(result.html || "");
+          setPreviewLoading(false);
+          return;
+        }
+
+        if (result?.kind === "url") {
+          setPreviewUrl(result.url || null);
+          setPreviewLoading(false);
+          return;
+        }
+
+        if (result?.kind === "unsupported") {
+          setPreviewError(
+            result.message || "Preview not supported for this file type.",
+          );
+          setPreviewLoading(false);
+          return;
+        }
+
+        setPreviewError("Preview not supported for this file type.");
+        setPreviewLoading(false);
+      },
+      { autoRevoke: true },
+    ); // Modal automatically revokes URL after 60s to save memory
+  }, [isOpen, doc, fileType, previewDocument]);
+
+  // Revoke object URL on unmount or when previewUrl changes
+  useEffect(() => {
     return () => {
-      if (previewUrl && !previewUrl.startsWith('http')) {
+      if (previewUrl && !previewUrl.startsWith("http")) {
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [isOpen, doc, fileType, previewDocument]);
+  }, [previewUrl]);
 
   if (!isOpen || !doc) return null;
 
   // Resolve the extension
-  const resolvedExt = (
-    fileType ||
-    doc.fileFormat ||
-    (doc.fileUrl ? doc.fileUrl.split('.').pop() : '') ||
-    ''
-  ).toLowerCase().trim();
+  const resolvedExt = getSafeExtension(fileType, doc.fileFormat, doc.fileUrl)
+    .toLowerCase()
+    .trim();
 
-  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(resolvedExt);
-  const isPdf = resolvedExt === 'pdf';
-  const isOfficeType = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(resolvedExt);
-  const isText = ['txt', 'html'].includes(resolvedExt);
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(
+    resolvedExt,
+  );
+  const isPdf = resolvedExt === "pdf";
+  const isDocx = resolvedExt === "docx";
+  const isOfficeType = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(
+    resolvedExt,
+  );
+  const isText = ["txt", "html"].includes(resolvedExt);
   const canPreview = isImage || isPdf || isOfficeType || isText;
 
   // Display label (upper-cased for the UI)
@@ -131,7 +191,9 @@ export default function DocumentPreviewModal({
             <p className="text-xs text-text-muted mt-0.5 flex items-center gap-2 flex-wrap">
               {doc.author && <span>By {doc.author}</span>}
               {doc.author && <span>•</span>}
-              <span className="uppercase font-semibold text-[10px] text-slate-500">{typeLabel || doc.type}</span>
+              <span className="uppercase font-semibold text-[10px] text-slate-500">
+                {typeLabel || doc.type}
+              </span>
               {doc.subject && (
                 <>
                   <span>•</span>
@@ -147,7 +209,9 @@ export default function DocumentPreviewModal({
                 onClick={() => onDownload(doc)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer font-medium"
               >
-                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  download
+                </span>
                 <span className="hidden sm:inline">Download</span>
               </button>
             )}
@@ -156,7 +220,9 @@ export default function DocumentPreviewModal({
               className="w-10 h-10 flex items-center justify-center border border-outline-variant hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-text-main"
               aria-label="Close preview"
             >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+              <span className="material-symbols-outlined text-[20px]">
+                close
+              </span>
             </button>
           </div>
         </div>
@@ -168,7 +234,40 @@ export default function DocumentPreviewModal({
             {previewLoading ? (
               <div className="flex flex-col items-center justify-center text-slate-500 select-none">
                 <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mb-4" />
-                <span className="text-sm font-medium">Securing document preview stream...</span>
+                <span className="text-sm font-medium">
+                  Securing document preview stream...
+                </span>
+              </div>
+            ) : previewError ? (
+              <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none mx-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mb-5">
+                  <span className="material-symbols-outlined text-3xl">
+                    error
+                  </span>
+                </div>
+                <h4 className="font-display text-headline-sm text-red-500 font-bold mb-2">
+                  Preview Unavailable
+                </h4>
+                <p className="text-body-sm text-text-muted mb-6">
+                  {previewError}
+                </p>
+                {onDownload && (
+                  <button
+                    onClick={() => onDownload(doc)}
+                    className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      download
+                    </span>
+                    <span>Download instead</span>
+                  </button>
+                )}
+              </div>
+            ) : previewHtml && isDocx ? (
+              <div className="w-full h-full overflow-y-auto p-6 md:p-8 flex justify-center bg-slate-100">
+                <div className="w-full max-w-4xl bg-white rounded-xl border border-outline-variant shadow-md p-8 md:p-10 prose prose-slate max-w-none">
+                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                </div>
               </div>
             ) : previewUrl ? (
               isImage ? (
@@ -184,21 +283,26 @@ export default function DocumentPreviewModal({
               ) : (
                 <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none mx-4">
                   <div className="w-16 h-16 mx-auto rounded-2xl bg-academic-gold/10 text-academic-gold flex items-center justify-center mb-5">
-                    <span className="material-symbols-outlined text-3xl">draft</span>
+                    <span className="material-symbols-outlined text-3xl">
+                      draft
+                    </span>
                   </div>
                   <h4 className="font-display text-headline-sm text-text-main font-bold mb-2">
                     Preview Not Supported
                   </h4>
                   <p className="text-body-sm text-text-muted mb-6">
-                    In-browser preview is not available for <b>{resolvedExt ? `.${resolvedExt}` : 'this type of'}</b> files.
-                    Download the file to view it on your device.
+                    In-browser preview is not available for{" "}
+                    <b>{resolvedExt ? `.${resolvedExt}` : "this type of"}</b>{" "}
+                    files. Download the file to view it on your device.
                   </p>
                   {onDownload && (
                     <button
                       onClick={() => onDownload(doc)}
                       className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
                     >
-                      <span className="material-symbols-outlined text-[18px]">download</span>
+                      <span className="material-symbols-outlined text-[18px]">
+                        download
+                      </span>
                       <span>Download File</span>
                     </button>
                   )}
@@ -207,13 +311,16 @@ export default function DocumentPreviewModal({
             ) : (
               <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-md select-none mx-4">
                 <div className="w-16 h-16 mx-auto rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mb-5">
-                  <span className="material-symbols-outlined text-3xl">error</span>
+                  <span className="material-symbols-outlined text-3xl">
+                    error
+                  </span>
                 </div>
                 <h4 className="font-display text-headline-sm text-red-500 font-bold mb-2">
                   Preview Unavailable
                 </h4>
                 <p className="text-body-sm text-text-muted mb-6">
-                  We could not secure a preview stream for this document. It may have been deleted, or you might not have authorization.
+                  We could not secure a preview stream for this document. It may
+                  have been deleted, or you might not have authorization.
                 </p>
               </div>
             )}
@@ -228,21 +335,33 @@ export default function DocumentPreviewModal({
 
               {doc.subject && (
                 <div>
-                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">Subject</label>
-                  <span className="text-body-sm font-semibold text-text-main">{doc.subject}</span>
+                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">
+                    Subject
+                  </label>
+                  <span className="text-body-sm font-semibold text-text-main">
+                    {doc.subject}
+                  </span>
                 </div>
               )}
               {doc.category && (
                 <div>
-                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">Category</label>
-                  <span className="text-body-sm font-semibold text-text-main">{doc.category}</span>
+                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">
+                    Category
+                  </label>
+                  <span className="text-body-sm font-semibold text-text-main">
+                    {doc.category}
+                  </span>
                 </div>
               )}
               {doc.downloads !== undefined && (
                 <div>
-                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">Downloads</label>
+                  <label className="text-[10px] font-semibold text-text-muted block mb-0.5">
+                    Downloads
+                  </label>
                   <div className="flex items-center gap-1.5 text-text-main font-semibold text-body-sm">
-                    <span className="material-symbols-outlined text-[16px] text-secondary">download</span>
+                    <span className="material-symbols-outlined text-[16px] text-secondary">
+                      download
+                    </span>
                     <span>{doc.downloads} times</span>
                   </div>
                 </div>
@@ -254,7 +373,9 @@ export default function DocumentPreviewModal({
                 onClick={() => onAiChat(doc)}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-secondary text-white rounded-lg font-label-md text-label-md shadow-sm hover:bg-secondary-container transition-all cursor-pointer font-medium"
               >
-                <span className="material-symbols-outlined text-[18px]">chat</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  chat
+                </span>
                 <span>AI Chat with this Doc</span>
               </button>
             )}
@@ -265,8 +386,12 @@ export default function DocumentPreviewModal({
                   {doc.author.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] text-text-muted block">Uploaded by</span>
-                  <span className="text-xs font-bold text-text-main truncate block">{doc.author}</span>
+                  <span className="text-[10px] text-text-muted block">
+                    Uploaded by
+                  </span>
+                  <span className="text-xs font-bold text-text-main truncate block">
+                    {doc.author}
+                  </span>
                 </div>
               </div>
             )}

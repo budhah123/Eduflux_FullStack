@@ -22,8 +22,20 @@ export default function DocumentTable({
 
   const getDocMeta = (doc) => {
     const category = doc.category || '';
-    const fileUrl = doc.fileUrl || '';
-    const extension = fileUrl.split('.').pop().toLowerCase();
+    const fileFormat = doc.fileFormat || '';
+    
+    let extension = fileFormat.toLowerCase();
+    if (!extension && doc.fileUrl) {
+      const parts = doc.fileUrl.split('?')[0].split('/');
+      const filename = parts[parts.length - 1];
+      const dotIndex = filename.lastIndexOf('.');
+      if (dotIndex !== -1) {
+        extension = filename.slice(dotIndex + 1).toLowerCase();
+      }
+    }
+    if (!extension) {
+      extension = 'file';
+    }
     
     if (category === 'Research Paper' || category === 'Research Papers') {
       return { icon: 'article', color: 'bg-academic-gold/10 text-academic-gold', extLabel: 'DOCX' };
@@ -40,7 +52,7 @@ export default function DocumentTable({
     if (extension === 'pptx' || extension === 'ppt') {
       return { icon: 'slideshow', color: 'bg-academic-red/10 text-academic-red', extLabel: 'PPTX' };
     }
-    return { icon: 'description', color: 'bg-academic-blue/10 text-academic-blue', extLabel: extension.toUpperCase() || 'FILE' };
+    return { icon: 'description', color: 'bg-academic-blue/10 text-academic-blue', extLabel: extension.toUpperCase() };
   };
 
   const formatFileSize = (bytes) => {

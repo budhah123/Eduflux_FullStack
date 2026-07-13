@@ -30,6 +30,11 @@ export const documentApi = {
     return apiClient.get(`/documents/${id}/download`);
   },
 
+  // GET /documents/:id/preview-url
+  getPreviewUrl: async (id) => {
+    return apiClient.get(`/documents/${id}/preview-url`);
+  },
+
   // GET /documents/:id
   getDocument: async (id) => {
     return apiClient.get(`/documents/${id}`);
