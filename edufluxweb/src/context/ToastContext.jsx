@@ -48,19 +48,25 @@ export function ToastProvider({ children }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`glass-card bg-white/80 dark:bg-surface-container/80 backdrop-blur-md border border-emerald-500/20 shadow-lg shadow-emerald-500/5 rounded-2xl p-4 flex gap-3 items-start relative overflow-hidden pointer-events-auto transition-all duration-300 ${
+            className={`glass-card bg-white/80 dark:bg-surface-container/80 backdrop-blur-md border shadow-lg rounded-2xl p-4 flex gap-3 items-start relative overflow-hidden pointer-events-auto transition-all duration-300 ${
+              toast.type === 'error'
+                ? 'border-red-500/20 shadow-red-500/5'
+                : 'border-emerald-500/20 shadow-emerald-500/5'
+            } ${
               toast.isExiting ? 'animate-toast-out' : 'animate-toast-in'
             }`}
           >
-            {/* Success Icon */}
-            <span className="material-symbols-outlined text-emerald-500 text-2xl select-none mt-0.5">
-              check_circle
+            {/* Icon */}
+            <span className={`material-symbols-outlined text-2xl select-none mt-0.5 ${
+              toast.type === 'error' ? 'text-red-500' : 'text-emerald-500'
+            }`}>
+              {toast.type === 'error' ? 'error' : 'check_circle'}
             </span>
             
             {/* Content */}
             <div className="flex-grow">
               <h4 className="font-label-md text-label-md text-text-main dark:text-on-surface font-semibold">
-                Success
+                {toast.type === 'error' ? 'Error' : 'Success'}
               </h4>
               <p className="text-body-sm text-body-sm text-text-muted dark:text-on-surface-variant mt-0.5">
                 {toast.message}
@@ -79,7 +85,9 @@ export function ToastProvider({ children }) {
             </button>
 
             {/* Shrinking Time Progress Bar */}
-            <div className="absolute bottom-0 left-0 h-1 bg-emerald-500 animate-progress-bar w-full"></div>
+            <div className={`absolute bottom-0 left-0 h-1 animate-progress-bar w-full ${
+              toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'
+            }`}></div>
           </div>
         ))}
       </div>

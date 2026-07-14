@@ -9,6 +9,17 @@ services:
       - backend
     environment:
       - VITE_API_URL=http://localhost:3000
+    volumes:
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./edufluxweb
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./edufluxweb/package.json
 
   backend:
     build:
@@ -20,3 +31,14 @@ services:
       - ./EduFlux_Backend/.env
     environment:
       - NODE_ENV=development
+    volumes:
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./EduFlux_Backend
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./EduFlux_Backend/package.json

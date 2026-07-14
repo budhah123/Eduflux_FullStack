@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 
-export default function Login() {
+export default function AdminLogin() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [email, setEmail] = useState('')
@@ -19,7 +19,7 @@ export default function Login() {
     setSuccess('')
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/login`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/admin/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,17 +30,18 @@ export default function Login() {
       const data = await response.json()
 
       if (!response.ok) {
-        const errMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Login failed')
+        const errMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Admin login failed')
         throw new Error(errMsg)
       }
 
-      showToast('Login completed successfully')
-      setSuccess('Login successful! Redirecting to dashboard...')
+      showToast('Admin login completed successfully')
+      setSuccess('Admin login successful! Redirecting to dashboard...')
+      sessionStorage.setItem('adminToken', data.accessToken)
       sessionStorage.setItem('accessToken', data.accessToken)
       sessionStorage.setItem('refreshToken', data.refreshToken)
 
       setTimeout(() => {
-        navigate('/dashboard')
+        navigate('/admin/dashboard')
       }, 1200)
     } catch (err) {
       setError(err.message)
@@ -49,10 +50,6 @@ export default function Login() {
       setLoading(false)
     }
   }
-
-  const handleGoogleLogin = () => {
-    showToast('Google authentication is not configured for this environment.', 'error');
-  };
 
   return (
     <>
@@ -89,7 +86,7 @@ export default function Login() {
                 <span className="material-symbols-outlined text-[#3525cd] text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>school</span>
                 <h1 className="text-2xl font-bold tracking-tight text-[#3525cd]">Eduflux</h1>
               </div>
-              <h2 className="text-xl font-bold text-[#1E293B]">Welcome Back</h2>
+              <h2 className="text-xl font-bold text-[#1E293B]">Admin Portal</h2>
               <p className="text-[#64748B] text-sm mt-2 text-center">Manage your academic resources with precision.</p>
             </div>
 
@@ -112,7 +109,7 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email Field */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-600 block" htmlFor="email">Email Address</label>
+                <label className="text-xs font-semibold text-slate-600 block" htmlFor="email">Admin Email Address</label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">mail</span>
                   <input
@@ -120,7 +117,7 @@ export default function Login() {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="name@university.edu"
+                    placeholder="admin@university.edu"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -132,7 +129,6 @@ export default function Login() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-semibold text-slate-600 block" htmlFor="password">Password</label>
-                  <a className="text-xs text-[#3525cd] hover:underline transition-all font-medium" href="#">Forgot Password?</a>
                 </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">lock</span>
@@ -158,19 +154,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Remember Me */}
-              <div className="flex items-center">
-                <input
-                  className="w-4 h-4 text-[#3525cd] border-[#c7c4d8]/50 rounded focus:ring-[#3525cd]/20"
-                  id="remember"
-                  name="remember"
-                  type="checkbox"
-                />
-                <label className="ml-2 text-xs text-slate-500 select-none font-medium" htmlFor="remember">
-                  Remember this device for 30 days
-                </label>
-              </div>
-
               {/* Submit Button */}
               <button
                 className="w-full py-3 bg-[#3525cd] text-white font-semibold text-sm rounded-lg shadow-lg shadow-[#3525cd]/20 hover:bg-[#3525cd]/90 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
@@ -183,46 +166,21 @@ export default function Login() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Authenticating...
+                    Authenticating Admin...
                   </>
                 ) : (
-                  'Login to Dashboard'
+                  'Login to Portal'
                 )}
               </button>
             </form>
 
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#c7c4d8]/40"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-4 text-[#64748B] font-medium">Or continue with</span>
-              </div>
-            </div>
-
-            {/* OAuth Section */}
-            <div className="space-y-4">
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 py-3 border border-[#c7c4d8]/40 bg-white text-[#1E293B] font-semibold text-sm rounded-lg hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 shadow-sm"
-              >
-                <img
-                  alt="Google Logo"
-                  className="w-5 h-5"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkpylnaavTjdEosE4vpKLmDmXCNgPqcotfjehf6qUzbljkWSOlrXSg4J6h2zJhT05FCdMuOBfKcXqv7M7pmhTSarPAnPkwwD-LaffxqJTH7ulUnwdh3_V4t0iVm6fKhxuINolsquc_-cLV5zqyHPjkOkCLfntsOyhUenAosgDb2ZIXX_6_fvRgaZxQN8N2MGQY8o1oMso4fsO4wMzLp8V_BbmDQrdQzPZBwWZgpLxpYolYsrPdMhbL4fmo-CqvJPCqqgUFa00X5yCD"
-                />
-                Sign in with Google
-              </button>
-            </div>
-
-            {/* Academic Notice */}
+            {/* Notice */}
             <div className="mt-8 p-4 bg-[#3525cd]/5 border border-[#3525cd]/10 rounded-lg">
               <div className="flex gap-3">
-                <span className="material-symbols-outlined text-[#3525cd] text-[20px]">info</span>
+                <span className="material-symbols-outlined text-[#3525cd] text-[20px]">security</span>
                 <div className="flex-1">
                   <p className="text-xs text-[#3525cd] leading-tight font-medium">
-                    <span className="font-bold">Techspire Students:</span> Please use your official university email <span className="font-mono">@cps.edu.np</span> to access research datasets.
+                    <span className="font-bold">Authorized Personnel Only:</span> This system is protected. Admin actions are logged for compliance monitoring.
                   </p>
                 </div>
               </div>
