@@ -1,0 +1,42 @@
+name: NestJS CI/CD
+
+# Trigger workflow on push or pull request to these branches
+on:
+  push:
+    branches:
+      - dev
+      - uat
+      - prod
+  pull_request:
+    branches:
+      - dev
+      - uat
+      - prod
+
+jobs:
+  build-and-test:
+    name: Build and Test NestJS
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 4️⃣ Run tests (optional)
+      # - name: Run tests
+      #   run: npm run test
+
+      # 5️⃣ Build project
+      - name: Build project
+        run: npm run build

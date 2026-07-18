@@ -1,0 +1,1 @@
+export const UPLOAD_CONFIG_NAME = 'UPLOAD_CONFIG_NAME';
