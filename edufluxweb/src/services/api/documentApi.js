@@ -51,4 +51,41 @@ export const documentApi = {
     const queryString = params.toString();
     return apiClient.get(`/documents${queryString ? `?${queryString}` : ''}`);
   },
+
+  // GET /admin/document
+  adminGetDocuments: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    const queryString = params.toString();
+    return apiClient.get(`/admin/document${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // GET /admin/document/:id
+  adminGetDocument: async (id) => {
+    return apiClient.get(`/admin/document/${id}`);
+  },
+
+  // POST /admin/document/upload
+  adminUploadDocument: async (formData) => {
+    return apiClient.post('/admin/document/upload', formData);
+  },
+
+  // PATCH /admin/document/:id
+  adminUpdateDocument: async (id, formData) => {
+    return apiClient.patch(`/admin/document/${id}`, formData);
+  },
+
+  // DELETE /admin/document/:id
+  adminDeleteDocument: async (id) => {
+    return apiClient.delete(`/admin/document/${id}`);
+  },
+
+  // PATCH /admin/document/:id/status
+  adminChangeStatus: async (id, status) => {
+    return apiClient.patch(`/admin/document/${id}/status`, JSON.stringify({ status }));
+  },
 };
