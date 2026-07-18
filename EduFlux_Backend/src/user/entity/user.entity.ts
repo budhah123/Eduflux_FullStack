@@ -58,6 +58,14 @@ export class UserEntity extends CommonAttribute {
   isActive: boolean;
 
   @ApiProperty({
+    description: 'Indicates whether the user is an institutional user',
+    type: Boolean,
+    example: false,
+  })
+  @Column('boolean', { name: 'isInstitutional', default: false })
+  isInstitutional: boolean;
+
+  @ApiProperty({
     description: 'Type of the user',
     type: String,
     example: UserType.USER,
