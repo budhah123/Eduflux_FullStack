@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -55,14 +56,17 @@ export class CreateUserInput {
     example: true,
     required: false,
   })
+  @IsBoolean()
   @IsOptional()
-  isActive?: boolean;
+  isActive?: boolean = true;
 
   @ApiProperty({
     description: 'Type of the user',
     type: String,
     example: UserType.USER,
+    required: false,
   })
   @IsEnum(UserType)
-  userType?: UserType;
+  @IsOptional()
+  userType?: UserType = UserType.USER;
 }
