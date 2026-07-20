@@ -1,6 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreateDocumentInput {
   @ApiProperty({
@@ -84,4 +90,14 @@ export class CreateDocumentInput {
   @IsString()
   @IsOptional()
   fileFormat?: string;
+
+  // create-document.input.ts (add this field)
+  @ApiProperty({
+    description: 'Whether this document requires unlock',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPremiumOnly?: boolean;
 }

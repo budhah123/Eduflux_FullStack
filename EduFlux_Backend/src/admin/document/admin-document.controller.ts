@@ -19,17 +19,20 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiOperation,
+  ApiParam,
+  ApiResponse,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
 import { AdminAtGuard } from 'src/auth/decorator';
 import {
   CreateDocumentInput,
-  DocumentsService,
   UpdateDocumentInput,
   UploadDocumentInput,
-} from 'src/documents';
+} from 'src/documents/dto';
+import { DocumentsService } from 'src/documents/documents.service';
 import { FilterDocumentDto } from 'src/documents/dto/filter-document.dto';
+import { ChangeStatusDto } from 'src/documents/dto/change-status.dto';
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'application/pdf',
@@ -148,8 +151,25 @@ export class AdminDocumentController {
     return this.documentService.deleteAsAdmin(id);
   }
   @Patch(':id/status')
+  @AdminAtGuard()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Admin: change document status' })
-  changeStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.documentService.changeStatus(id, status);
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID to update status for',
+    example: '64b8c9f1e4b0a2d3c4e5f678',
+  })
+  @ApiBody({ type: ChangeStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Document status updated successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden — admin access required',
+  })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  changeStatus(@Param('id') id: string, @Body() dto: ChangeStatusDto) {
+    return this.documentService.changeStatus(id, dto.status);
   }
 }

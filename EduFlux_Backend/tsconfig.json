@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "types": ["node", "jest"],
+    "types": [
+      "node",
+      "jest"
+    ],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
@@ -24,12 +27,30 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@app/database": ["libs/database/src"],
-      "@app/database/*": ["libs/database/src/*"],
-      "@app/file-upload": ["libs/file-upload/src"],
-      "@app/file-upload/*": ["libs/file-upload/src/*"],
-      "@app/swagger": ["libs/swagger/src"],
-      "@app/swagger/*": ["libs/swagger/src/*"]
+      "@app/access": [
+        "libs/access/src"
+      ],
+      "@app/access/*": [
+        "libs/access/src/*"
+      ],
+      "@app/database": [
+        "libs/database/src"
+      ],
+      "@app/database/*": [
+        "libs/database/src/*"
+      ],
+      "@app/file-upload": [
+        "libs/file-upload/src"
+      ],
+      "@app/file-upload/*": [
+        "libs/file-upload/src/*"
+      ],
+      "@app/swagger": [
+        "libs/swagger/src"
+      ],
+      "@app/swagger/*": [
+        "libs/swagger/src/*"
+      ]
     }
   }
 }
