@@ -13,6 +13,7 @@ import { CreateDocumentInput, UpdateDocumentInput } from './dto';
 import { FilterDocumentDto } from './dto/filter-document.dto';
 import { ObjectId } from 'mongodb';
 import { UserService } from '../user/user.service';
+import { DocumentStatus } from './enum';
 
 @Injectable()
 export class DocumentsService {
@@ -314,8 +315,17 @@ export class DocumentsService {
   }
 
   // ─── ADMIN: change status ─────────────────────────────
-  async changeStatus(id: string, status: string): Promise<DocumentEntity> {
-    await this.documentRepository.update({ _id: new ObjectId(id) }, { status });
+  async changeStatus(
+    id: string,
+    status: DocumentStatus,
+  ): Promise<DocumentEntity> {
+    const result = await this.documentRepository.update(
+      { _id: new ObjectId(id) },
+      { status },
+    );
+    if (result.affected === 0) {
+      throw new NotFoundException(`Document ${id} not found`);
+    }
     return this.findById(id);
   }
 

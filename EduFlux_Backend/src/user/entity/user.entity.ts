@@ -73,6 +73,17 @@ export class UserEntity extends CommonAttribute {
   @Column('varchar', { name: 'userType', default: UserType.USER })
   userType?: UserType;
 
+  @ApiProperty({ description: 'Approved uploads count', example: 0 })
+  @Column('int', { name: 'approvedUploadCount', default: 0 })
+  approvedUploadCount: number = 0;
+
+  @ApiProperty({
+    description: 'Unlock credits earned from uploads',
+    example: 0,
+  })
+  @Column('int', { name: 'unlockCredits', default: 0 })
+  unlockCredits: number = 0;
+
   @BeforeInsert()
   async hashedPassword() {
     // Only hash password if it exists (skip for OAuth users)

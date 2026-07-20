@@ -110,6 +110,16 @@ export class DocumentEntity extends CommonAttribute {
   status: string;
 
   @ApiProperty({
+    description:
+      'Whether this document requires unlock (subscription/upload-credit) or is free for everyone',
+    type: Boolean,
+    example: true,
+    default: true,
+  })
+  @Column('boolean', { name: 'isPremiumOnly', default: true })
+  isPremiumOnly: boolean = true;
+
+  @ApiProperty({
     description: 'User ID of the uploader',
     type: String,
     example: '64b8c9f1e4b0a2d3c4e5f678',

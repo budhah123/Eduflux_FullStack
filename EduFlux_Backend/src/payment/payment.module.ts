@@ -1,14 +1,18 @@
+// src/payment/payment.module.ts
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { SubscriptionEntity } from 'src/subscription/entity';
+import { UserEntity } from 'src/user/entity';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
-import { PaymentEntity } from './entity';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DocumentsModule } from 'src/documents';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PaymentEntity]), DocumentsModule],
-  providers: [PaymentService],
+  imports: [
+    HttpModule,
+    TypeOrmModule.forFeature([SubscriptionEntity, UserEntity]),
+  ],
   controllers: [PaymentController],
-  exports: [PaymentService],
+  providers: [PaymentService],
 })
 export class PaymentModule {}

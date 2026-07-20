@@ -5,12 +5,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentEntity } from './entity';
 import { FileUploadModule } from '@app/file-upload';
 import { UserModule } from '../user/user.module';
+import { AccessModule } from '@app/access';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([DocumentEntity]),
     FileUploadModule,
     UserModule,
+    AccessModule
   ],
   providers: [DocumentsService],
   controllers: [DocumentsController],

@@ -1,261 +1,149 @@
-import {
-  BadRequestException,
-  Header,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios'; // correct
 import { InjectRepository } from '@nestjs/typeorm';
-import { PaymentEntity } from './entity';
+import { SubscriptionEntity } from 'src/subscription/entity';
 import { MongoRepository } from 'typeorm';
-import { DocumentsService } from '../documents';
-import {
-  CreateCheckoutInput,
-  ManualVerifyInput,
-  VerifyPaymentInput,
-  GenerateEsewaDataInput,
-} from './dto';
-import { ObjectId } from 'mongodb';
-import { v4 as uuidv4 } from 'uuid';
-import { PaymentMethod, PaymentStatus } from './enum';
+import { UserEntity } from 'src/user/entity';
+import { InitiatePaymentDto, VerifyPaymentDto } from './dto';
+import { firstValueFrom } from 'rxjs';
+import { AxiosResponse } from 'axios';
 import * as crypto from 'crypto';
+import { ObjectId } from 'mongodb';
+import { PaymentProvider } from 'src/subscription/enum/payment-provider.enum';
+import { PlanType } from 'src/subscription/enum/plan-type.enum';
+import { SubscriptionStatus } from 'src/subscription/enum/subscription-status.enum';
 
 @Injectable()
 export class PaymentService {
   constructor(
-    @InjectRepository(PaymentEntity)
-    private readonly paymentRepository: MongoRepository<PaymentEntity>,
-    private readonly documentsService: DocumentsService,
+    private http: HttpService,
+    @InjectRepository(SubscriptionEntity)
+    private subscriptionRepository: MongoRepository<SubscriptionEntity>,
+    @InjectRepository(UserEntity)
+    private userRepository: MongoRepository<UserEntity>,
   ) {}
 
-  async createCheckoutPayment(createCheckoutInput: CreateCheckoutInput) {
-    const { method, assignmentId, amount } = createCheckoutInput;
-    const assignment = await this.documentsService.findById(assignmentId);
-    if (!assignment) {
-      throw new NotFoundException(`File with ${assignmentId} nof found`);
-    }
+  // ================= INITIATE =================
 
-    const transactionUuid = `${Date.now()}-${uuidv4()}`;
-    const payment = this.paymentRepository.create({
-      ...createCheckoutInput,
-      transactionUuid:
-        method === PaymentMethod.ESWEA ? transactionUuid : undefined,
-      assignment,
-    });
+  async initiatePayment(userId: string, dto: InitiatePaymentDto) {
+    if (dto.provider === PaymentProvider.KHALTI)
+      return this.initiateKhaltiPayment(userId, dto);
 
-    // Save payment to database to generate _id before using it in URLs
-    await this.paymentRepository.save(payment);
+    if (dto.provider === PaymentProvider.ESEWA)
+      return this.initiateEsewaPayment(userId, dto);
 
-    // =====================================ESEWA ====================================
-    if (method === PaymentMethod.ESWEA) {
-      const signatureString = `total_amount=${amount},transaction_uuid=${transactionUuid},product_code=${process.env.ESEWA_MERCHANT_CODE}`;
+    throw new Error('Invalid payment provider');
+  }
 
-      const signature = crypto
-        .createHmac('sha256', process.env.ESEWA_SECRET_KEY!)
-        .update(signatureString)
-        .digest('base64');
-      return {
-        paymentId: payment._id,
-        esewaConfig: {
-          total_amount: amount,
-          transaction_uuid: transactionUuid,
-          product_code: process.env.ESEWA_MERCHANT_CODE,
-          success_url: `${process.env.BASE_URL}/payment/verify?method=${PaymentMethod.ESWEA}&paymentId=${payment._id}`,
-          failure_url: `${process.env.BASE_URL}`,
-          signature,
-        },
-      };
-    }
+  private async initiateKhaltiPayment(userId: string, dto: InitiatePaymentDto) {
+    const payload = {
+      return_url: `${process.env.FRONTEND_URL}/subscription/khalti/callback`,
+      website_url: process.env.FRONTEND_URL,
+      amount: dto.amount * 100, // paisa
+      purchase_order_id: `${userId}-${Date.now()}`,
+      purchase_order_name: `Eduflux ${dto.planType} subscription`,
+    };
 
-    // ==========Khalti============
-    if (method === PaymentMethod.KHALTI) {
-      const khaltiAmount = Math.round(amount * 100);
-
-      const response = await fetch(
+    const res: AxiosResponse<any> = await firstValueFrom(
+      this.http.post(
         'https://a.khalti.com/api/v2/epayment/initiate/',
-
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            return_url: `${process.env.BASE_URL}/payment/verify?method=${PaymentMethod.KHALTI}&paymentId=${payment._id}`,
-            website_url: `${process.env.BASE_URL}`,
-            amount: khaltiAmount,
-            purchase_order_id: payment._id,
-            purchase_order_title: assignment.title,
-          }),
-        },
-      );
-      if (!response.ok) {
-        throw new BadRequestException('Khalti Initialization Failed');
-      }
-      const data = await response.json();
-      return {
-        paymentId: payment._id,
-        khaltiPaymentUrl: data.payment_url,
-      };
-    }
-    throw new BadRequestException('Invalid Payment Method');
-  }
-
-  // ==============================
-  // VERIFY PAYMENT
-  // ==============================
-  async verifyPayment(verifyPaymentInput: VerifyPaymentInput) {
-    const { method, paymentId, data, pidx } = verifyPaymentInput;
-    const payment = await this.paymentRepository.findOne({
-      where: { _id: new ObjectId(paymentId) },
-    });
-    if (!payment) {
-      throw new NotFoundException(`Payment with ${paymentId} not found `);
-    }
-
-    // ==========ESEWA Verification================
-    if (method === PaymentMethod.ESWEA && data) {
-      const decoded = JSON.parse(Buffer.from(data, 'base64').toString('utf-8'));
-
-      // TEST MODE: Skip external verification
-      if (process.env.PAYMENT_TEST_MODE === 'true') {
-        payment.paymentStatus = PaymentStatus.COMPLETED;
-        const result = await this.paymentRepository.save(payment);
-        return {
-          message: 'Payment Successful (Test Mode)',
-          result,
-        };
-      }
-
-      const verifyUrl = `${process.env.ESEWA_VERIFY_URL}?product_code=${process.env.ESEWA_MERCHANT_CODE}&total_amount=${decoded.total_amount}&transaction_uuid=${decoded.transaction_uuid}`;
-
-      const response = await fetch(verifyUrl);
-      const verification = await response.json();
-
-      if (verification.status === 'COMPLETE') {
-        payment.paymentStatus = PaymentStatus.COMPLETED;
-        const result = await this.paymentRepository.save(payment);
-        return {
-          message: 'Payment Successful',
-          result,
-        };
-      }
-      return {
-        message: 'Payment Pending',
-      };
-    }
-
-    // ========= Khalti Verification =========
-    if (method === PaymentMethod.KHALTI && pidx) {
-      // TEST MODE: Skip external verification
-      if (process.env.PAYMENT_TEST_MODE === 'true') {
-        payment.paymentStatus = PaymentStatus.COMPLETED;
-        payment.khaltiPidix = pidx;
-        await this.paymentRepository.save(payment);
-        return {
-          message: 'Payment Successful (Test Mode)',
-        };
-      }
-
-      const response = await fetch(process.env.KHALTI_VERIFY_URL!, {
-        method: 'POST',
-        headers: {
-          Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pidx }),
-      });
-
-      const result = await response.json();
-
-      if (result.status === 'Completed') {
-        payment.paymentStatus = PaymentStatus.COMPLETED;
-        payment.khaltiPidix = pidx;
-        await this.paymentRepository.save(payment);
-        return {
-          message: 'Payment Successful',
-        };
-      }
-      return {
-        message: 'Payment pending',
-      };
-    }
-    throw new BadRequestException('Invalid verification request');
-  }
-
-  // ==============================
-  // MANUAL VERIFY (For Testing)
-  // ==============================
-  async manualVerify(manualVerifyInput: ManualVerifyInput) {
-    const { paymentId } = manualVerifyInput;
-
-    const payment = await this.paymentRepository.findOne({
-      where: { _id: new ObjectId(paymentId) },
-    });
-
-    if (!payment) {
-      throw new NotFoundException(`Payment with ${paymentId} not found`);
-    }
-
-    if (payment.paymentStatus === PaymentStatus.COMPLETED) {
-      return {
-        message: 'Payment already completed',
-        payment,
-      };
-    }
-
-    payment.paymentStatus = PaymentStatus.COMPLETED;
-    const result = await this.paymentRepository.save(payment);
-
-    return {
-      message: 'Payment manually verified and marked as completed',
-      result,
-    };
-  }
-
-  // ==============================
-  // GENERATE ESEWA DATA (For Testing)
-  // ==============================
-  async generateEsewaData(generateEsewaDataInput: GenerateEsewaDataInput) {
-    const { paymentId, transactionCode, status } = generateEsewaDataInput;
-
-    const payment = await this.paymentRepository.findOne({
-      where: { _id: new ObjectId(paymentId) },
-    });
-
-    if (!payment) {
-      throw new NotFoundException(`Payment with ${paymentId} not found`);
-    }
-
-    if (payment.method !== PaymentMethod.ESWEA) {
-      throw new BadRequestException(
-        'This endpoint only works for eSewa payments',
-      );
-    }
-
-    // Create the data object that eSewa would send
-    const esewaData = {
-      transaction_code: transactionCode || '0007KNH',
-      status: status || 'COMPLETE',
-      total_amount: payment.amount.toString(),
-      transaction_uuid: payment.transactionUuid,
-      product_code: process.env.ESEWA_MERCHANT_CODE || 'EPAYTEST',
-      signed_field_names:
-        'transaction_code,status,total_amount,transaction_uuid,product_code,signed_field_names',
-    };
-
-    // Encode to base64
-    const base64Data = Buffer.from(JSON.stringify(esewaData)).toString(
-      'base64',
+        payload,
+        { headers: { Authorization: `Key ${process.env.KHALTI_SECRET_KEY}` } },
+      ),
     );
 
-    // Generate the complete verify URL
-    const verifyUrl = `${process.env.BASE_URL}/payment/verify?method=ESWEA&paymentId=${paymentId}&data=${base64Data}`;
+    return res.data; // { pidx, payment_url }
+  }
+
+  private async initiateEsewaPayment(userId: string, dto: InitiatePaymentDto) {
+    const transactionUuid = `${userId}-${Date.now()}`;
+    const totalAmount = dto.amount;
+
+    const signatureString = `total_amount=${totalAmount},transaction_uuid=${transactionUuid},product_code=${process.env.ESEWA_MERCHANT_CODE}`;
+    const signature = crypto
+      .createHmac('sha256', `${process.env.ESEWA_SECRET_KEY}`)
+      .update(signatureString)
+      .digest('base64');
 
     return {
-      message: 'eSewa test data generated successfully',
-      esewaData,
-      base64Data,
-      verifyUrl,
+      formUrl: 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
+      fields: {
+        amount: totalAmount,
+        tax_amount: 0,
+        total_amount: totalAmount,
+        transaction_uuid: transactionUuid,
+        product_code: process.env.ESEWA_MERCHANT_CODE,
+        product_service_charge: 0,
+        product_delivery_charge: 0,
+        success_url: `${process.env.FRONTEND_URL}/subscription/esewa/callback`,
+        failure_url: `${process.env.FRONTEND_URL}/subscription/failed`,
+        signed_field_names: 'total_amount,transaction_uuid,product_code',
+        signature,
+      },
     };
+  }
+
+  // ================= VERIFY =================
+  async verifyPayment(userId: string, dto: VerifyPaymentDto): Promise<boolean> {
+    if (dto.provider === PaymentProvider.KHALTI) return this.verifyKhalti(dto);
+    if (dto.provider === PaymentProvider.ESEWA) return this.verifyEsewa(dto);
+    throw new BadRequestException('Unsupported payment provider');
+  }
+
+  private async verifyKhalti(dto: VerifyPaymentDto): Promise<boolean> {
+    const res: AxiosResponse<any> = await firstValueFrom(
+      this.http.post(
+        `${process.env.KHALTI_VERIFY_URL}`,
+        { pidx: dto.pidx },
+        { headers: { Authorization: `Key ${process.env.KHALTI_SECRET_KEY}` } },
+      ),
+    );
+    return res.data.status === 'Completed';
+  }
+
+  private async verifyEsewa(dto: VerifyPaymentDto): Promise<boolean> {
+    const res: AxiosResponse<any> = await firstValueFrom(
+      this.http.get(`${process.env.ESEWA_VERIFY_URL}`, {
+        params: {
+          product_code: process.env.ESEWA_MERCHANT_CODE,
+          transaction_uuid: dto.transactionUuid,
+          total_amount: dto.amount,
+        },
+      }),
+    );
+    return res.data.status === 'COMPLETE';
+  }
+
+  // ================= ACTIVATE SUBSCRIPTION =================
+  async activateSubscription(userId: string, dto: VerifyPaymentDto) {
+    const user = await this.userRepository.findOne({
+      where: { _id: new ObjectId(userId) },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    let sub = await this.subscriptionRepository.findOne({
+      where: { userId: new ObjectId(userId) },
+    });
+
+    const expiry = new Date();
+    if (dto.planType === PlanType.YEARLY)
+      expiry.setFullYear(expiry.getFullYear() + 1);
+    else expiry.setMonth(expiry.getMonth() + 1);
+
+    if (!sub) {
+      sub = this.subscriptionRepository.create({
+        user,
+      } as Partial<SubscriptionEntity>);
+    }
+
+    sub.status = SubscriptionStatus.ACTIVE;
+    sub.planType = dto.planType;
+    sub.expiryDate = expiry;
+    sub.paymentProvider = dto.provider;
+    sub.transactionId = dto.pidx ?? dto.transactionUuid;
+
+    return this.subscriptionRepository.save(sub);
   }
 }

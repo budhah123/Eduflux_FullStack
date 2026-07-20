@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1060.0",
     "@aws-sdk/s3-request-presigner": "^3.1060.0",
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
@@ -30,7 +31,7 @@
     "@nestjs/platform-express": "^11.1.13",
     "@nestjs/swagger": "^11.2.5",
     "@nestjs/typeorm": "^11.0.0",
-    "axios": "^1.13.5",
+    "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
@@ -102,10 +103,11 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/src/$1",
+      "^@app/access(|/.*)$": "<rootDir>/libs/access/src/$1",
       "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@app/file-upload(|/.*)$": "<rootDir>/libs/file-upload/src/$1",
-      "^@app/swagger(|/.*)$": "<rootDir>/libs/swagger/src/$1"
+      "^@app/swagger(|/.*)$": "<rootDir>/libs/swagger/src/$1",
+      "^src/(.*)$": "<rootDir>/src/$1"
     }
   }
 }

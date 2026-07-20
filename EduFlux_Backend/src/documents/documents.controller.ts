@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   Res,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as express from 'express';
@@ -35,6 +36,7 @@ import {
   UploadDocumentInput,
 } from './dto';
 import { AtGuard, AdminAtGuard } from '../auth/decorator';
+import { AccessService } from '@app/access';
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'application/pdf',
@@ -66,9 +68,10 @@ export class DocumentsController {
   constructor(
     private documentsService: DocumentsService,
     private uploadService: FileUploadService,
+    private accessService: AccessService,
   ) {}
 
-  // PUBLIC
+  // PUBLIC — browse list, no lock detail needed here, just metadata
   @Get()
   @ApiOperation({ summary: 'Browse all published documents' })
   findAll(@Query() filter: FilterDocumentDto) {
@@ -88,11 +91,27 @@ export class DocumentsController {
   }
 
   @Get('/view/:id')
+  @AtGuard()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'View document' })
-  async viewFile(@Param('id') id: string, @Res() res: express.Response) {
-    const document = await this.findOne(id);
+  async viewFile(
+    @Param('id') id: string,
+    @Res() res: express.Response,
+    @Req() req,
+  ) {
+    const document = await this.documentsService.findById(id);
     if (!document) {
       throw new NotFoundException(`Document with id: ${id} not found`);
+    }
+
+    // access gate — block premium doc stream if not unlocked
+    if (document.isPremiumOnly) {
+      const result = await this.accessService.checkAccess(req.user);
+      if (!result.access) {
+        throw new ForbiddenException(
+          'Subscribe via Khalti/eSewa or upload 3 documents to unlock this document',
+        );
+      }
     }
 
     const isRemote =
@@ -194,8 +213,17 @@ export class DocumentsController {
   @ApiOperation({
     summary: 'Get preview URL without incrementing download count',
   })
-  async previewUrl(@Param('id') id: string) {
+  async previewUrl(@Param('id') id: string, @Req() req) {
     const doc = await this.documentsService.findById(id);
+    if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
+
+    if (doc.isPremiumOnly) {
+      const result = await this.accessService.checkAccess(req.user);
+      if (!result.access) {
+        throw new ForbiddenException('Unlock this document to preview it');
+      }
+    }
+
     const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
     const url = await this.uploadService.createSignedUrl(
       doc.fileKey,
@@ -211,8 +239,19 @@ export class DocumentsController {
   @AtGuard()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get download URL + increment count' })
-  async download(@Param('id') id: string) {
+  async download(@Param('id') id: string, @Req() req) {
     const doc = await this.documentsService.findById(id);
+    if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
+
+    if (doc.isPremiumOnly) {
+      const result = await this.accessService.checkAccess(req.user);
+      if (!result.access) {
+        throw new ForbiddenException(
+          'Subscribe via Khalti/eSewa or upload 3 documents to unlock this document',
+        );
+      }
+    }
+
     await this.documentsService.incrementDownload(id);
     const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
     const signedUrl = await this.uploadService.createSignedUrl(
@@ -224,10 +263,32 @@ export class DocumentsController {
     return { url: signedUrl };
   }
 
+  // PROTECTED now — needed so req.user available for isLocked check
   @Get(':id')
+  @AtGuard()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get single document' })
-  findOne(@Param('id') id: string) {
-    return this.documentsService.findById(id);
+  async findOne(@Param('id') id: string, @Req() req) {
+    const doc = await this.documentsService.findById(id);
+    if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
+
+    if (!doc.isPremiumOnly) {
+      return { ...doc, isLocked: false };
+    }
+
+    const result = await this.accessService.checkAccess(req.user);
+
+    if (result.access) {
+      return { ...doc, isLocked: false, unlockedVia: result.reason };
+    }
+
+    return {
+      id: doc._id,
+      title: doc.title,
+      isLocked: true,
+      approvedUploadCount: req.user.approvedUploadCount,
+      message: 'Subscribe via Khalti/eSewa or upload 3 documents to unlock',
+    };
   }
 
   @Post('upload')
@@ -283,18 +344,12 @@ export class DocumentsController {
   ) {
     return this.documentsService.update(id, dto, req.user.id);
   }
+
   @Delete(':id')
   @AtGuard()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete document' })
   delete(@Param('id') id: string, @Req() req) {
     return this.documentsService.deleteOwn(id, req.user._id);
-  }
-  @Patch(':id/status')
-  @AdminAtGuard()
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Admin: change document status' })
-  changeStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.documentsService.changeStatus(id, status);
   }
 }
