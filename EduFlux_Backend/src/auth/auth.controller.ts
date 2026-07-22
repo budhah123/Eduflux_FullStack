@@ -33,7 +33,7 @@ import {
 } from '@nestjs/swagger';
 import { GoogleOAuthGuard } from './guards/google-oauth.guards';
 import { UpdatePasswordInput } from './dto/update-password.input';
-import { AtGuard } from './decorator';
+import { AtGuard, CurrentUser } from './decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -73,6 +73,26 @@ export class AuthController {
     const user = await this.authService.validateUser(email, password);
     return await this.authService.generateTokens(user);
   }
+
+  @AtGuard()
+  @ApiBearerAuth('JWT-auth')
+  @Get('me')
+  @ApiOperation({ summary: 'Get the current authenticated user profile' })
+  async me(@CurrentUser() user: any) {
+    return {
+      id: user._id?.toString?.() ?? user._id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      fullName:
+        [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+        user.email?.split('@')?.[0] ||
+        'User',
+      email: user.email,
+      userType: user.userType,
+      avatarUrl: user.avatarUrl || user.profilePicture || null,
+    };
+  }
+
   @UseGuards(GoogleOAuthGuard)
   @Get('google/login')
   async googleLogin() {

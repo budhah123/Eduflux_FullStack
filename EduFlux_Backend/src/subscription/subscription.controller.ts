@@ -2,7 +2,6 @@ import { Controller, Delete, Get, Req } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { AtGuard } from 'src/auth/decorator';
-import { ObjectId } from 'mongodb';
 
 @Controller('subscription')
 export class SubscriptionController {
@@ -17,9 +16,7 @@ export class SubscriptionController {
     type: 'object',
   })
   async getMySubscription(@Req() req: any) {
-    return this.subscriptionService.getSubscription({
-      'user._id': new ObjectId(req.user._id),
-    } as any);
+    return this.subscriptionService.getSubscription(req.user._id.toString());
   }
 
   @Delete('cancel')
@@ -31,8 +28,6 @@ export class SubscriptionController {
     type: 'object',
   })
   async cancelMySubscription(@Req() req: any) {
-    return this.subscriptionService.cancelSubscription(
-      new ObjectId(req.user._id) as any,
-    );
+    return this.subscriptionService.cancelSubscription(req.user._id.toString());
   }
 }

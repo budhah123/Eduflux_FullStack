@@ -1,39 +1,88 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react';
+import { apiClient } from '../../services/api/apiClient';
+import { useNavigate } from 'react-router-dom';
 
-export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobileOpen, onNewUploadClick }) {
-  const navigate = useNavigate()
-  const [userName, setUserName] = useState('Hemraj')
-  const [userRole, setUserRole] = useState('Researcher')
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  mobileOpen,
+  setMobileOpen,
+  onNewUploadClick,
+}) {
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState('User');
+  const [userRole, setUserRole] = useState('Researcher');
+  const [userAvatar, setUserAvatar] = useState(null);
+
+  const decodeTokenProfile = (token) => {
+    if (!token) return null;
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window
+          .atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
-    const token = sessionStorage.getItem('accessToken')
-    if (token) {
+    let mounted = true;
+
+    const loadProfile = async () => {
+      const token = sessionStorage.getItem('accessToken');
+      const fallback = decodeTokenProfile(token);
+
+      if (!token || !fallback) return;
+
       try {
-        const base64Url = token.split('.')[1]
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-        const jsonPayload = decodeURIComponent(
-          window.atob(base64)
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        )
-        const payload = JSON.parse(jsonPayload)
-        
-        // Extract name, username, or email prefix
-        const name = payload.name || payload.username || (payload.email && payload.email.split('@')[0])
-        if (name) {
-          // Capitalize first letter
-          setUserName(name.charAt(0).toUpperCase() + name.slice(1))
-        }
-        if (payload.role) {
-          setUserRole(payload.role.charAt(0).toUpperCase() + payload.role.slice(1))
-        }
-      } catch (e) {
-        console.error('Error decoding token:', e)
+        const profile = await apiClient.get('/users/me');
+        if (!mounted) return;
+        const firstName =
+          profile?.firstName ||
+          profile?.fullName?.split(' ')?.[0] ||
+          fallback.firstName ||
+          fallback.name ||
+          fallback.email?.split('@')?.[0];
+        setUserName(
+          firstName
+            ? firstName.charAt(0).toUpperCase() + firstName.slice(1)
+            : 'User',
+        );
+        setUserRole(
+          profile?.isInstitutional
+            ? 'Techspire Student'
+            : fallback.role
+              ? `${fallback.role.charAt(0).toUpperCase()}${fallback.role.slice(1)}`
+              : 'Researcher',
+        );
+        setUserAvatar(profile?.avatarUrl || null);
+      } catch {
+        if (!mounted) return;
+        const name =
+          fallback.name ||
+          fallback.username ||
+          (fallback.email && fallback.email.split('@')[0]);
+        if (name) setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+        if (fallback.role)
+          setUserRole(
+            fallback.role.charAt(0).toUpperCase() + fallback.role.slice(1),
+          );
       }
-    }
-  }, [])
+    };
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const sidebarItems = [
     { name: 'Overview', label: 'Dashboard', icon: 'dashboard' },
@@ -41,14 +90,20 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
     { name: 'My Uploads', label: 'My Uploads', icon: 'upload_file' },
     { name: 'AI Chat', label: 'AI Chat', icon: 'auto_awesome' },
     { name: 'Bookmarks', label: 'Bookmarks', icon: 'bookmark' },
-    { name: 'Settings', label: 'Settings', icon: 'settings' }
-  ]
+    {
+      name: 'Subscription',
+      label: 'Subscription',
+      icon: 'credit_card',
+      route: '/subscription',
+    },
+    { name: 'Settings', label: 'Settings', icon: 'settings' },
+  ];
 
   const handleLogout = () => {
-    sessionStorage.removeItem('accessToken')
-    sessionStorage.removeItem('refreshToken')
-    navigate('/login')
-  }
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
+    navigate('/login');
+  };
 
   return (
     <>
@@ -69,7 +124,10 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
         {/* Brand Header */}
         <div className="mb-10 px-4 flex items-center justify-between">
           <span className="font-headline-sm text-headline-sm font-bold text-primary flex items-center gap-2 select-none">
-            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+            <span
+              className="material-symbols-outlined text-2xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
               auto_stories
             </span>
             Eduflux
@@ -87,13 +145,17 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
         {/* Navigation Items */}
         <nav className="flex-1 space-y-1">
           {sidebarItems.map((item, idx) => {
-            const isActive = activeTab === item.name
+            const isActive = activeTab === item.name;
             return (
               <button
                 key={idx}
                 onClick={() => {
-                  setActiveTab(item.name)
-                  setMobileOpen(false) // auto close drawer on mobile click
+                  if (item.route) {
+                    navigate(item.route);
+                  } else {
+                    setActiveTab(item.name);
+                  }
+                  setMobileOpen(false); // auto close drawer on mobile click
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-label-md text-label-md transition-all duration-200 select-none cursor-pointer text-left ${
                   isActive
@@ -101,12 +163,15 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
                     : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]" style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}>
+                <span
+                  className="material-symbols-outlined text-[20px]"
+                  style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
+                >
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
               </button>
-            )
+            );
           })}
         </nav>
 
@@ -115,26 +180,38 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
           {/* New Upload Button */}
           <button
             onClick={() => {
-              setMobileOpen(false)
-              if (onNewUploadClick) onNewUploadClick()
+              setMobileOpen(false);
+              if (onNewUploadClick) onNewUploadClick();
             }}
             className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:shadow-primary/20 transition-all active:scale-95 cursor-pointer select-none"
           >
-            <span className="material-symbols-outlined" data-icon="add">add</span>
+            <span className="material-symbols-outlined" data-icon="add">
+              add
+            </span>
             New Upload
           </button>
 
           {/* User Profile */}
           <div className="mt-6 flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
-              <img
-                alt="User Profile"
-                className="w-10 h-10 rounded-full border border-outline-variant object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAg-iOEbr03Zq5JHsk5H40AVj8WbvRd4CbvygVs6PQNua0C90Vm8tuN7-Ukr6-VqJIPhwko9O3OM6axjS1wrJb4OUMmyCmY0sW_UfCFVNaLkmIyIh-pp_RaTfpDQBmtfY0n-Fw64d7pcan3O6Lc0Pd6IBDF1aYFgerGPGRbqwGyITwN2t1C7-_yvcPEQpuIA8dBW1yvug4vqQHfT19LrsyIflAQzCHSTjn5TPwn_jVqBH2XrRTC2M0w3-7-JOHDR8v2Qq5uFFgoDcc9"
-              />
+              {userAvatar ? (
+                <img
+                  alt="User Profile"
+                  className="w-10 h-10 rounded-full border border-outline-variant object-cover"
+                  src={userAvatar}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full border border-outline-variant bg-primary text-white flex items-center justify-center font-bold">
+                  {userName.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <div className="max-w-[110px] overflow-hidden">
-                <p className="font-label-md text-label-md font-bold text-on-surface truncate leading-tight">{userName}</p>
-                <p className="text-[10px] text-text-muted truncate mt-0.5">{userRole}</p>
+                <p className="font-label-md text-label-md font-bold text-on-surface truncate leading-tight">
+                  {userName}
+                </p>
+                <p className="text-[10px] text-text-muted truncate mt-0.5">
+                  {userRole}
+                </p>
               </div>
             </div>
 
@@ -145,11 +222,13 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
               aria-label="Logout"
               title="Logout"
             >
-              <span className="material-symbols-outlined text-[20px]">logout</span>
+              <span className="material-symbols-outlined text-[20px]">
+                logout
+              </span>
             </button>
           </div>
         </div>
       </aside>
     </>
-  )
+  );
 }

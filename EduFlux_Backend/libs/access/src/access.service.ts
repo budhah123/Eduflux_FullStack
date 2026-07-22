@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from 'src/user/entity';
 import { SubscriptionEntity } from 'src/subscription/entity';
 import { SubscriptionStatus } from 'src/subscription/enum/subscription-status.enum';
-
+import { ObjectId } from 'mongodb';
 
 export interface AccessResult {
   access: boolean;
@@ -28,7 +28,19 @@ export class AccessService {
     }
 
     // Path 2: Active paid subscription (Khalti/eSewa)
-    const sub = await this.subRepo.findOneBy({ 'user._id': user._id } as any);
+    const userId = user._id?.toString();
+    const userObjectId =
+      userId && ObjectId.isValid(userId) ? new ObjectId(userId) : user._id;
+    const sub = await this.subRepo.findOne({
+      where: {
+        $or: [
+          { userId },
+          { userId: userObjectId },
+          { 'user._id': userObjectId },
+          { 'user._id': userId },
+        ],
+      } as any,
+    });
     if (
       sub &&
       sub.status === SubscriptionStatus.ACTIVE &&

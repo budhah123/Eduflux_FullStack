@@ -17,7 +17,7 @@ export const documentApi = {
 
   // PATCH /documents/:id
   updateDocument: async (id, data) => {
-    return apiClient.patch(`/documents/${id}`, JSON.stringify(data));
+    return apiClient.patch(`/documents/${id}`, data);
   },
 
   // DELETE /documents/:id
@@ -43,8 +43,12 @@ export const documentApi = {
   // GET /documents
   getAllDocuments: async (filters = {}) => {
     const params = new URLSearchParams();
-    Object.keys(filters).forEach(key => {
-      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+    Object.keys(filters).forEach((key) => {
+      if (
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ''
+      ) {
         params.append(key, filters[key]);
       }
     });
@@ -55,13 +59,19 @@ export const documentApi = {
   // GET /admin/document
   adminGetDocuments: async (filters = {}) => {
     const params = new URLSearchParams();
-    Object.keys(filters).forEach(key => {
-      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+    Object.keys(filters).forEach((key) => {
+      if (
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ''
+      ) {
         params.append(key, filters[key]);
       }
     });
     const queryString = params.toString();
-    return apiClient.get(`/admin/document${queryString ? `?${queryString}` : ''}`);
+    return apiClient.get(
+      `/admin/document${queryString ? `?${queryString}` : ''}`,
+    );
   },
 
   // GET /admin/document/:id
@@ -86,6 +96,21 @@ export const documentApi = {
 
   // PATCH /admin/document/:id/status
   adminChangeStatus: async (id, status) => {
-    return apiClient.patch(`/admin/document/${id}/status`, JSON.stringify({ status }));
+    return apiClient.patch(`/admin/document/${id}/status`, { status });
+  },
+
+  // POST /payment/initiate
+  initiatePayment: async (data) => {
+    return apiClient.post('/payment/initiate', data);
+  },
+
+  // GET /users/me/upload-progress (or /user/me/upload-progress)
+  getUploadProgress: async () => {
+    return apiClient.get('/users/me/upload-progress');
+  },
+
+  // GET /users/me
+  getCurrentUser: async () => {
+    return apiClient.get('/users/me');
   },
 };

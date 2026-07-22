@@ -61,6 +61,8 @@
   --color-text-main: #1e293b;
   --color-text-muted: #64748b;
   --color-bg-subtle: #f3f4f6;
+  --color-academic-navy: #0F2C59;
+  --color-academic-amber: #F5A623;
   --color-academic-red: #b80000;
   --color-academic-blue: #3a65aa;
   --color-academic-gold: #eaa03f;
@@ -99,80 +101,100 @@
       opacity: 0;
       transform: translateY(16px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
+
   @keyframes slideUp {
     from {
       opacity: 0;
       transform: translateY(24px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
+
   @keyframes float {
+
     0%,
     100% {
       transform: translateY(0);
     }
+
     50% {
       transform: translateY(-10px);
     }
   }
+
   @keyframes pulseSoft {
+
     0%,
     100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.7;
     }
   }
+
   @keyframes gradientX {
+
     0%,
     100% {
       background-position: 0% 50%;
     }
+
     50% {
       background-position: 100% 50%;
     }
   }
+
   @keyframes shimmer {
     0% {
       background-position: -400px 0;
     }
+
     100% {
       background-position: 400px 0;
     }
   }
+
   @keyframes slideIn {
     from {
       transform: translateX(120%);
       opacity: 0;
     }
+
     to {
       transform: translateX(0);
       opacity: 1;
     }
   }
+
   @keyframes slideOut {
     from {
       transform: translateX(0);
       opacity: 1;
     }
+
     to {
       transform: translateX(120%);
       opacity: 0;
     }
   }
+
   @keyframes shrink {
     from {
       width: 100%;
     }
+
     to {
       width: 0%;
     }
@@ -183,6 +205,7 @@
 @utility font-display {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-display {
   font-size: 48px;
   line-height: 56px;
@@ -193,6 +216,7 @@
 @utility font-headline-lg {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-headline-lg {
   font-size: 32px;
   line-height: 40px;
@@ -203,6 +227,7 @@
 @utility font-headline-lg-mobile {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-headline-lg-mobile {
   font-size: 24px;
   line-height: 32px;
@@ -212,6 +237,7 @@
 @utility font-headline-md {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-headline-md {
   font-size: 24px;
   line-height: 32px;
@@ -221,6 +247,7 @@
 @utility font-headline-sm {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-headline-sm {
   font-size: 20px;
   line-height: 28px;
@@ -230,6 +257,7 @@
 @utility font-body-lg {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-body-lg {
   font-size: 18px;
   line-height: 28px;
@@ -239,6 +267,7 @@
 @utility font-body-md {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-body-md {
   font-size: 16px;
   line-height: 24px;
@@ -248,6 +277,7 @@
 @utility font-body-sm {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-body-sm {
   font-size: 14px;
   line-height: 20px;
@@ -257,6 +287,7 @@
 @utility font-label-md {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-label-md {
   font-size: 14px;
   line-height: 20px;
@@ -267,6 +298,7 @@
 @utility font-label-sm {
   font-family: "Inter", sans-serif;
 }
+
 @utility text-label-sm {
   font-size: 12px;
   line-height: 16px;
@@ -328,6 +360,7 @@ body {
 .active-nav-border {
   position: relative;
 }
+
 .active-nav-border::after {
   content: "";
   position: absolute;
@@ -378,18 +411,49 @@ body {
   background: rgba(255, 255, 255, 0.85);
 }
 
+/* Glass panel for locked document overlay (Stitch spec) */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Document blur filter for locked state (Stitch spec) */
+.document-blur {
+  filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+}
+
 /* Slim scrollbar for preview panels */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #c7c4d8;
   border-radius: 9999px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #777587;
+}
+
+/* Dotted pattern for Unlock options contribution card */
+.dotted-pattern {
+  background-image: radial-gradient(#0F2C59 0.5px, transparent 0.5px);
+  background-size: 10px 10px;
+  opacity: 0.1;
+}
+
+/* Gradient blob for background ambient glows */
+.gradient-blob {
+  filter: blur(80px);
+  z-index: -1;
 }

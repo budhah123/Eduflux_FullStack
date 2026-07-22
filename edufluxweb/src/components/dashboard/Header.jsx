@@ -1,31 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
+import { apiClient } from '../../services/api/apiClient';
 
 export default function Header({ activeTab, setMobileOpen, onSearch }) {
-  const [userRole, setUserRole] = useState('Student User')
+  const [userRole, setUserRole] = useState('Student User');
 
   useEffect(() => {
-    const token = sessionStorage.getItem('accessToken')
-    if (token) {
+    let mounted = true;
+
+    const loadRole = async () => {
       try {
-        const base64Url = token.split('.')[1]
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-        const jsonPayload = decodeURIComponent(
-          window.atob(base64)
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        )
-        const payload = JSON.parse(jsonPayload)
-        if (payload.role) {
-          setUserRole(payload.role.charAt(0).toUpperCase() + payload.role.slice(1) + ' Dashboard')
+        const profile = await apiClient.get('/users/me');
+        if (!mounted) return;
+        if (profile?.isInstitutional) {
+          setUserRole('Free Access — Techspire Student');
         } else {
-          setUserRole('Academic Workspace')
+          setUserRole(
+            profile?.fullName
+              ? `${profile.fullName.split(' ')[0]}'s Dashboard`
+              : 'Academic Workspace',
+          );
         }
-      } catch (e) {
-        setUserRole('Academic Workspace')
+      } catch {
+        if (!mounted) return;
+        setUserRole('Academic Workspace');
       }
-    }
-  }, [])
+    };
+
+    loadRole();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <header className="flex justify-between items-center w-full px-6 h-16 bg-surface-bright border-b border-outline-variant sticky top-0 z-30 select-none">
@@ -58,13 +64,17 @@ export default function Header({ activeTab, setMobileOpen, onSearch }) {
       <div className="flex items-center gap-2">
         {/* Notification Bell */}
         <div className="p-2 hover:bg-surface-container-high rounded-full cursor-pointer relative group transition-all">
-          <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
+          <span className="material-symbols-outlined text-on-surface-variant">
+            notifications
+          </span>
           <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
         </div>
 
         {/* Help Button */}
         <div className="p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-all">
-          <span className="material-symbols-outlined text-on-surface-variant">help</span>
+          <span className="material-symbols-outlined text-on-surface-variant">
+            help
+          </span>
         </div>
 
         <div className="h-8 w-[1px] bg-outline-variant mx-2"></div>
@@ -77,5 +87,5 @@ export default function Header({ activeTab, setMobileOpen, onSearch }) {
         </div>
       </div>
     </header>
-  )
+  );
 }
