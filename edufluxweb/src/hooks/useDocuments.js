@@ -49,6 +49,13 @@ export function useDocuments(showToast) {
   // Load documents on mount
   useEffect(() => {
     loadDocuments();
+    const refresh = () => loadDocuments();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+    };
   }, [loadDocuments]);
 
   // Clean form
@@ -97,6 +104,7 @@ export function useDocuments(showToast) {
         if (showToast) showToast('Document metadata updated successfully');
         setUploadModalOpen(false);
         loadDocuments();
+        window.dispatchEvent(new Event('eduflux:documents-updated'));
       } catch (err) {
         if (showToast) showToast(err.message, 'error');
       } finally {
@@ -128,7 +136,7 @@ export function useDocuments(showToast) {
 
         // Simulate progress increment since fetch does not natively support onUploadProgress easily
         const interval = setInterval(() => {
-          setUploadProgress(prev => {
+          setUploadProgress((prev) => {
             if (prev >= 90) {
               clearInterval(interval);
               return 90;
@@ -144,6 +152,7 @@ export function useDocuments(showToast) {
         if (showToast) showToast('Document uploaded successfully');
         setUploadModalOpen(false);
         loadDocuments();
+        window.dispatchEvent(new Event('eduflux:documents-updated'));
       } catch (err) {
         if (showToast) showToast(err.message, 'error');
       } finally {
@@ -154,24 +163,29 @@ export function useDocuments(showToast) {
 
   // Delete a document
   const deleteDoc = async (id) => {
-    if (!window.confirm('Are you sure you want to permanently delete this document?')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to permanently delete this document?',
+      )
+    ) {
       return;
     }
 
-    setDeletingIds(prev => [...prev, id]);
+    setDeletingIds((prev) => [...prev, id]);
     try {
       const res = await documentApi.deleteDocument(id);
       if (showToast) {
         showToast(res?.message || 'Document deleted successfully');
       }
       // Remove from the list on success
-      setDocuments(prev => prev.filter(doc => doc._id !== id));
+      setDocuments((prev) => prev.filter((doc) => doc._id !== id));
+      window.dispatchEvent(new Event('eduflux:documents-updated'));
     } catch (err) {
       if (showToast) {
         showToast(err.message || 'Error deleting document', 'error');
       }
     } finally {
-      setDeletingIds(prev => prev.filter(dId => dId !== id));
+      setDeletingIds((prev) => prev.filter((dId) => dId !== id));
     }
   };
 
@@ -185,8 +199,12 @@ export function useDocuments(showToast) {
       if (result && result.url) {
         window.open(result.url, '_blank');
         // Optimistically increment local count
-        setDocuments(prev =>
-          prev.map(d => d._id === id ? { ...d, downloadCount: (d.downloadCount || 0) + 1 } : d)
+        setDocuments((prev) =>
+          prev.map((d) =>
+            d._id === id
+              ? { ...d, downloadCount: (d.downloadCount || 0) + 1 }
+              : d,
+          ),
         );
       } else {
         throw new Error('Download URL not provided by the API');
@@ -207,38 +225,58 @@ export function useDocuments(showToast) {
     setNewCategory(doc.category || 'Lecture Notes');
     setNewDepartment(doc.department || '');
     setNewSemester(doc.semester || '');
-    setNewTags(Array.isArray(doc.tags) ? doc.tags.join(', ') : (typeof doc.tags === 'string' ? doc.tags : ''));
+    setNewTags(
+      Array.isArray(doc.tags)
+        ? doc.tags.join(', ')
+        : typeof doc.tags === 'string'
+          ? doc.tags
+          : '',
+    );
     setSelectedFile(null);
     setUploadModalOpen(true);
   };
 
   // Filter logic
-  const filteredDocs = Array.isArray(documents) ? documents.filter(doc => {
-    const searchVal = searchQuery.toLowerCase().trim();
-    const matchesSearch = searchVal === '' ||
-      (doc.title && doc.title.toLowerCase().includes(searchVal)) ||
-      (doc.description && doc.description.toLowerCase().includes(searchVal)) ||
-      (doc.department && doc.department.toLowerCase().includes(searchVal)) ||
-      (Array.isArray(doc.tags) && doc.tags.some(t => t.toLowerCase().includes(searchVal)));
+  const filteredDocs = Array.isArray(documents)
+    ? documents.filter((doc) => {
+        const searchVal = searchQuery.toLowerCase().trim();
+        const matchesSearch =
+          searchVal === '' ||
+          (doc.title && doc.title.toLowerCase().includes(searchVal)) ||
+          (doc.description &&
+            doc.description.toLowerCase().includes(searchVal)) ||
+          (doc.department &&
+            doc.department.toLowerCase().includes(searchVal)) ||
+          (Array.isArray(doc.tags) &&
+            doc.tags.some((t) => t.toLowerCase().includes(searchVal)));
 
-    if (!matchesSearch) return false;
+        if (!matchesSearch) return false;
 
-    if (activeCategory === 'All') return true;
-    if (activeCategory === 'Notes') {
-      return doc.category === 'Lecture Notes' || doc.category === 'Study Guide';
-    }
-    if (activeCategory === 'Papers') {
-      return doc.category === 'Research Paper' || doc.category === 'Research Papers';
-    }
-    if (activeCategory === 'Thesis') {
-      return doc.category === 'Thesis';
-    }
-    return true;
-  }) : [];
+        if (activeCategory === 'All') return true;
+        if (activeCategory === 'Notes') {
+          return (
+            doc.category === 'Lecture Notes' || doc.category === 'Study Guide'
+          );
+        }
+        if (activeCategory === 'Papers') {
+          return (
+            doc.category === 'Research Paper' ||
+            doc.category === 'Research Papers'
+          );
+        }
+        if (activeCategory === 'Thesis') {
+          return doc.category === 'Thesis';
+        }
+        return true;
+      })
+    : [];
 
   const totalPages = Math.ceil(filteredDocs.length / itemsPerPage) || 1;
   const activePage = Math.min(currentPage, totalPages);
-  const paginatedDocs = filteredDocs.slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage);
+  const paginatedDocs = filteredDocs.slice(
+    (activePage - 1) * itemsPerPage,
+    activePage * itemsPerPage,
+  );
 
   const totalDownloads = Array.isArray(documents)
     ? documents.reduce((acc, doc) => acc + (doc.downloadCount || 0), 0)
@@ -259,7 +297,7 @@ export function useDocuments(showToast) {
     setCurrentPage,
     totalPages,
     totalDownloads,
-    
+
     // Form States & Setters
     newTitle,
     setNewTitle,
@@ -277,12 +315,12 @@ export function useDocuments(showToast) {
     setSelectedFile,
     dragActive,
     setDragActive,
-    
+
     // Modal states
     isEditMode,
     uploadModalOpen,
     setUploadModalOpen,
-    
+
     // Actions
     handleSubmit,
     deleteDoc,

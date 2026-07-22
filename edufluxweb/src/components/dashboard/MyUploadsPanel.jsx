@@ -4,7 +4,11 @@ import StatsBento from './StatsBento';
 import DocumentTable from './DocumentTable';
 import UploadModal from './UploadModal';
 
-export default function MyUploadsPanel({ uploadModalOpen, setUploadModalOpen, showToast }) {
+export default function MyUploadsPanel({
+  uploadModalOpen,
+  setUploadModalOpen,
+  showToast,
+}) {
   const docsState = useDocuments(showToast);
 
   // Sync parent modal open state with hook's modal state
@@ -14,7 +18,12 @@ export default function MyUploadsPanel({ uploadModalOpen, setUploadModalOpen, sh
       docsState.setUploadModalOpen(true);
       setUploadModalOpen(false); // consume trigger
     }
-  }, [uploadModalOpen, docsState.uploadModalOpen, setUploadModalOpen, docsState]);
+  }, [
+    uploadModalOpen,
+    docsState.uploadModalOpen,
+    setUploadModalOpen,
+    docsState,
+  ]);
 
   return (
     <section className="p-8 max-w-container-max mx-auto w-full flex-1 animate-slide-up">
@@ -52,7 +61,9 @@ export default function MyUploadsPanel({ uploadModalOpen, setUploadModalOpen, sh
         <div className="flex items-center gap-3 w-full md:w-auto select-none">
           {/* Local Search input */}
           <div className="flex items-center bg-white border border-outline-variant/60 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all max-w-xs w-full shadow-sm">
-            <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
+            <span className="material-symbols-outlined text-outline text-[18px] mr-2">
+              search
+            </span>
             <input
               type="text"
               value={docsState.searchQuery}
@@ -101,7 +112,6 @@ export default function MyUploadsPanel({ uploadModalOpen, setUploadModalOpen, sh
         uploading={docsState.uploading}
         uploadProgress={docsState.uploadProgress}
         handleSubmit={docsState.handleSubmit}
-        
         // Field values
         newTitle={docsState.newTitle}
         setNewTitle={docsState.setNewTitle}

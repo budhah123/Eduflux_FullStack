@@ -7,7 +7,6 @@ import { SubscriptionStatus } from '../enum/subscription-status.enum';
 import { PlanType } from '../enum/plan-type.enum';
 import { PaymentProvider } from '../enum/payment-provider.enum';
 
-
 @Entity('subscriptions')
 export class SubscriptionEntity extends CommonAttribute {
   @ApiProperty({
@@ -25,6 +24,8 @@ export class SubscriptionEntity extends CommonAttribute {
   })
   @Column('varchar', { name: 'userId' })
   userId: string;
+
+  user?: UserEntity;
 
   @ApiProperty({
     description: 'Current status of subscription',
