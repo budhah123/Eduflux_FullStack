@@ -100,7 +100,7 @@ export default function DocumentViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(42);
+  const [totalPages, setTotalPages] = useState(null);
   const [saved, setSaved] = useState(false);
 
   // react-pdf Load States
@@ -119,6 +119,16 @@ export default function DocumentViewer({
 
   // Refs
   const previewContainerRef = useRef(null);
+  const pdfPageRef = useRef(null);
+
+  const previewFileType = getSafeExtension(
+    document?.fileFormat,
+    previewUrl || document?.fileUrl,
+  )
+    .toLowerCase()
+    .trim();
+  const isPdfPreview = Boolean(previewUrl && previewFileType === 'pdf');
+  const hasPageCount = isPdfPreview && Number.isFinite(totalPages) && totalPages > 0;
 
   // Determine actual lock state (forcedState > document.isLocked)
   const isLocked =
@@ -134,6 +144,9 @@ export default function DocumentViewer({
     setPreviewLoading(true);
     setPdfLoading(true);
     setPdfError(null);
+    setPage(1);
+    setTotalPages(null);
+    setScale(1.0);
   }, [id, overrideDoc]);
 
   // Sync user info from token
@@ -252,6 +265,10 @@ export default function DocumentViewer({
     setPreviewError(null);
     setPreviewHtml(null);
     setPreviewUrl(null);
+    setPage(1);
+    setTotalPages(null);
+    setPdfLoading(true);
+    setPdfError(null);
 
     const fileType = getSafeExtension(document.fileFormat, document.fileUrl)
       .toLowerCase()
@@ -327,13 +344,16 @@ export default function DocumentViewer({
   }, [previewUrl]);
 
   const onPdfLoadSuccess = ({ numPages }) => {
+    setPage(1);
     setTotalPages(numPages);
     setPdfLoading(false);
+    setPdfError(null);
   };
 
   const onPdfLoadError = () => {
     setPdfError('Failed to render PDF preview');
     setPdfLoading(false);
+    setTotalPages(null);
   };
 
   // Download PDF Handler (Calls GET /documents/:id/download)
@@ -430,6 +450,12 @@ export default function DocumentViewer({
 
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 2.5));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
+
+  useEffect(() => {
+    if (isPdfPreview && pdfPageRef.current) {
+      pdfPageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isPdfPreview, page]);
 
   const handleToggleFullscreen = () => {
     const element = previewContainerRef.current;
@@ -601,9 +627,15 @@ export default function DocumentViewer({
                     PAGE VIEW
                   </span>
                   <div className="h-4 w-px bg-outline-variant"></div>
-                  <span className="text-label-md font-label-md text-on-surface font-medium">
-                    {page} / {totalPages}
-                  </span>
+                  {hasPageCount ? (
+                    <span className="text-label-md font-label-md text-on-surface font-medium">
+                      Page {page} of {totalPages}
+                    </span>
+                  ) : isPdfPreview ? (
+                    <span className="text-label-md font-label-md text-on-surface font-medium">
+                      Loading pages...
+                    </span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -762,22 +794,72 @@ export default function DocumentViewer({
                 ) : (
                   /* STATE 2: UNLOCKED FULL ACCESS DESIGN */
                   <div className="w-full flex flex-col items-center justify-center relative">
-                    {previewLoading ? (
+                    {previewLoading || (isPdfPreview && pdfLoading) ? (
                       <div className="flex flex-col items-center gap-3 text-text-muted py-24">
                         <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin mb-2" />
                         <span className="text-sm font-medium">
                           Loading document viewer...
                         </span>
                       </div>
+                    ) : pdfError ? (
+                      <div className="w-full max-w-[800px] rounded-xl border border-outline-variant bg-white p-8 md:p-12 shadow-xl text-center">
+                        <span className="material-symbols-outlined text-4xl text-error mb-3">
+                          error
+                        </span>
+                        <p className="font-semibold text-on-surface mb-2">
+                          Preview Error
+                        </p>
+                        <p className="text-sm text-text-muted">{pdfError}</p>
+                      </div>
                     ) : previewHtml ? (
-                      <div className="w-full max-w-[800px] bg-white rounded-xl border border-outline-variant p-8 md:p-12 shadow-xl">
+                      <div className="w-full max-w-[800px] overflow-auto bg-white rounded-xl border border-outline-variant shadow-xl">
                         <div
-                          className="prose prose-slate max-w-none"
+                          className="origin-top mx-auto prose prose-slate max-w-none p-8 md:p-12"
+                          style={{
+                            transform: `scale(${scale})`,
+                            width: `${100 / scale}%`,
+                          }}
                           dangerouslySetInnerHTML={{ __html: previewHtml }}
                         />
                       </div>
+                    ) : isPdfPreview && previewUrl ? (
+                      <div className="w-full max-w-[900px] flex justify-center overflow-auto">
+                        <div ref={pdfPageRef} className="bg-white shadow-xl rounded-xl overflow-hidden border border-outline-variant">
+                          <PdfDocument
+                            file={previewUrl}
+                            onLoadSuccess={onPdfLoadSuccess}
+                            onLoadError={onPdfLoadError}
+                            loading={null}
+                            className="flex justify-center"
+                          >
+                            <PdfPage
+                              pageNumber={page}
+                              scale={scale}
+                              renderTextLayer={true}
+                              renderAnnotationLayer={true}
+                              loading={
+                                <div
+                                  className="flex items-center justify-center text-text-muted py-12 select-none"
+                                  style={{
+                                    width: 600 * scale,
+                                    height: 800 * scale,
+                                  }}
+                                >
+                                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2" />
+                                  <span className="text-xs">
+                                    Loading Page {page}...
+                                  </span>
+                                </div>
+                              }
+                            />
+                          </PdfDocument>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="bg-white w-full max-w-[800px] aspect-[1/1.414] shadow-xl p-12 md:p-16 relative group transition-transform hover:scale-[1.002]">
+                      <div
+                        className="bg-white w-full max-w-[800px] aspect-[1/1.414] shadow-xl p-12 md:p-16 relative group transition-transform hover:scale-[1.002]"
+                        style={{ transform: `scale(${scale})` }}
+                      >
                         <div className="border-b-2 border-primary-container pb-4 mb-8">
                           <h1 className="font-headline-md text-headline-md text-on-surface mb-2 font-bold">
                             {docData.title}
@@ -830,33 +912,35 @@ export default function DocumentViewer({
 
               {/* Floating Bottom Control Bar */}
               <div className="h-16 border border-outline-variant glass-blur flex items-center justify-center px-6 gap-6 md:gap-8 absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full shadow-lg w-fit z-30 select-none">
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={page <= 1}
-                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined">
-                      chevron_left
+                {hasPageCount && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={page <= 1}
+                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                      className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined">
+                        chevron_left
+                      </span>
+                    </button>
+                    <span className="text-label-md font-bold px-2 whitespace-nowrap text-sm">
+                      Page {page} of {totalPages}
                     </span>
-                  </button>
-                  <span className="text-label-md font-bold px-2 whitespace-nowrap text-sm">
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    disabled={page >= totalPages}
-                    onClick={() =>
-                      setPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined">
-                      chevron_right
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      disabled={page >= totalPages}
+                      onClick={() =>
+                        setPage((prev) => Math.min(prev + 1, totalPages))
+                      }
+                      className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined">
+                        chevron_right
+                      </span>
+                    </button>
+                  </div>
+                )}
 
-                <div className="h-6 w-px bg-outline-variant"></div>
+                {hasPageCount && <div className="h-6 w-px bg-outline-variant"></div>}
 
                 <div className="flex items-center gap-3">
                   <button
