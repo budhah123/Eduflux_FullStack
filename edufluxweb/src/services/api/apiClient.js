@@ -43,7 +43,10 @@ const request = async (url, options = {}) => {
         ? data.message.join(', ')
         : data.message
       : `HTTP error! status: ${response.status}`;
-    throw new Error(errMsg || 'Something went wrong');
+    const error = new Error(errMsg || 'Something went wrong');
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;

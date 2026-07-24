@@ -9,7 +9,7 @@ import { AdminModule } from './admin/admin.module';
 import { DocumentsModule } from './documents/documents.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
-
+import { DocumentChatModule } from './document-chat/document-chat.module';
 
 @Module({
   imports: [
@@ -23,7 +23,8 @@ import { PaymentModule } from './payment/payment.module';
     AdminModule,
     DocumentsModule,
     SubscriptionModule,
-    PaymentModule
+    PaymentModule,
+    DocumentChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
