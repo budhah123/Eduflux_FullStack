@@ -1,116 +1,272 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { documentApi } from '../../services/api/documentApi';
+
+const getFileIcon = (fileFormat, fileUrl) => {
+  let format = (fileFormat || '').toLowerCase();
+  if (!format && fileUrl) {
+    const ext = fileUrl.split('?')[0].split('.').pop();
+    format = (ext || '').toLowerCase();
+  }
+  switch (format) {
+    case 'pdf':
+      return 'description';
+    case 'docx':
+    case 'doc':
+      return 'article';
+    case 'txt':
+    case 'md':
+      return 'text_snippet';
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'svg':
+    case 'webp':
+      return 'image';
+    case 'ppt':
+    case 'pptx':
+      return 'slideshow';
+    default:
+      return 'description';
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return 'Unknown size';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
 
 export default function AIChatPanel({ showToast }) {
-  const [messages, setMessages] = useState([
-    {
-      sender: 'ai',
-      text: "Hello Academic User! I've finished processing Quantum_Computing_V2.pdf. You can ask me to summarize key findings, explain specific equations, or compare it with your previous uploads. What would you like to start with?",
-      chips: ['Summarize Paper', 'Extract Equations']
-    },
-    {
-      sender: 'user',
-      text: 'Can you explain the difference between superconducting qubits and trapped-ion qubits mentioned on page 14?'
-    },
-    {
-      sender: 'ai',
-      text: 'On page 14, the author distinguishes these two technologies based on their coherence times and scalability:',
-      bullets: [
-        'Superconducting Qubits: Faster gate speeds but shorter coherence times. They are easier to fabricate using established lithography but require ultra-cold dilution refrigerators.',
-        'Trapped-Ion Qubits: Much longer coherence times and high-fidelity gates, but currently face significant challenges in scaling to thousands of interconnected ions.'
-      ]
-    }
-  ])
+  const navigate = useNavigate();
 
-  const [inputValue, setInputValue] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [activePage, setActivePage] = useState(14)
-  const totalPages = 42
+  // Document list & selection state
+  const [recentDocs, setRecentDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [selectedDocId, setSelectedDocId] = useState(null);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
-  const chatEndRef = useRef(null)
+  // Chat conversation state
+  const [messages, setMessages] = useState([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
 
+  const chatEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Determine lock status
+  const isLocked = Boolean(selectedDoc?.isLocked);
+
+  // 1. Fetch Recent Documents on Mount
   useEffect(() => {
-    // Scroll chat feed to bottom on load or new message
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    const fetchDocuments = async () => {
+      try {
+        setLoadingDocs(true);
+        let docs = [];
+        const res = await documentApi.getMyUploads(1, 20);
+        if (res) {
+          docs = Array.isArray(res) ? res : res.data || res.documents || [];
+        }
+
+        // Fallback to all documents if user uploads are empty
+        if (!docs || docs.length === 0) {
+          const allRes = await documentApi.getAllDocuments({ limit: 20 });
+          if (allRes) {
+            docs = Array.isArray(allRes) ? allRes : allRes.data || allRes.documents || [];
+          }
+        }
+
+        setRecentDocs(docs);
+
+        // Auto-select first document if available
+        if (docs && docs.length > 0) {
+          setSelectedDocId(docs[0]._id);
+          setSelectedDoc(docs[0]);
+        }
+      } catch (err) {
+        console.error('Error fetching recent documents for AI chat:', err);
+        if (showToast) showToast('Failed to load recent documents', 'error');
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+
+    fetchDocuments();
+  }, []);
+
+  // 2. Fetch Selected Document Details & Preview URL when selectedDocId changes
+  useEffect(() => {
+    if (!selectedDocId) {
+      setSelectedDoc(null);
+      setPreviewUrl(null);
+      setMessages([]);
+      return;
     }
-  }, [messages, isTyping])
 
-  const handleSend = (textToSend) => {
-    if (!textToSend.trim()) return
+    const fetchDocDetails = async () => {
+      try {
+        setLoadingPreview(true);
 
-    // 1. Add User Message
-    const userMsg = { sender: 'user', text: textToSend }
-    setMessages((prev) => [...prev, userMsg])
-    setInputValue('')
+        // GET /documents/:id metadata
+        const docDetails = await documentApi.getDocument(selectedDocId);
+        if (docDetails) {
+          setSelectedDoc(docDetails);
+        }
 
-    // 2. Trigger typing indicator
-    setIsTyping(true)
+        // GET /documents/:id/preview-url
+        try {
+          const previewRes = await documentApi.getPreviewUrl(selectedDocId);
+          if (previewRes?.url) {
+            setPreviewUrl(previewRes.url);
+          } else if (docDetails?.fileUrl) {
+            setPreviewUrl(docDetails.fileUrl);
+          } else {
+            setPreviewUrl(null);
+          }
+        } catch (e) {
+          console.warn('Preview URL fetch fallback:', e);
+          setPreviewUrl(docDetails?.fileUrl || null);
+        }
 
-    // 3. Simulated AI Response after 1.5 seconds
-    setTimeout(() => {
-      setIsTyping(false)
+        // Reset & initialize chat history for new document
+        const lockedState = Boolean(docDetails?.isLocked);
+        setMessages([
+          {
+            id: 'init-1',
+            sender: 'ai',
+            text: lockedState
+              ? 'This document is currently locked. Unlock this document to ask questions about it.'
+              : `Hello! I am ready to analyze "${docDetails?.title || 'this document'}". Ask me any questions about its contents.`,
+          },
+        ]);
+      } catch (err) {
+        console.error('Error fetching document details for chat:', err);
+        setMessages([
+          {
+            id: 'init-err',
+            sender: 'ai',
+            text: 'Error loading document context. Please select another document or try again.',
+            isError: true,
+          },
+        ]);
+      } finally {
+        setLoadingPreview(false);
+      }
+    };
 
-      let aiResponseText = `I've analyzed your query regarding "${textToSend}". `
-      let aiBullets = null
+    fetchDocDetails();
+  }, [selectedDocId]);
 
-      if (textToSend.toLowerCase().includes('summarize')) {
-        aiResponseText += 'Here is a quick summary of the document:'
-        aiBullets = [
-          'Core Concept: Explores scaling constraints in intermediate scale quantum hardware.',
-          'Key Findings: Trapped-ion architectures exhibit 10x coherence durations compared to superconducting chips, but scale-up interconnects add major latency.',
-          'Recommendation: Hybrid photonic-ion systems are proposed as a path forward to overcome wiring bottlenecks.'
-        ]
-      } else if (textToSend.toLowerCase().includes('equation')) {
-        aiResponseText += 'I found the following core equations on page 14 and 17:'
-        aiBullets = [
-          'Coherence decay function: P(t) = exp(-(t/T_2)^alpha) where alpha parameterizes the noise spectrum.',
-          'Interconnection gate error rate scaling relation: E_gate = C_0 * N_qubits^2 log(N_qubits).'
-        ]
-      } else {
-        aiResponseText += "Based on Quantum_Computing_V2.pdf, page 14 notes that coherence is highly dependent on ambient noise shielding, and dilution refrigerator temperatures must remain below 15mK for superconducting components to maintain phase stability."
+  // Scroll chat feed to bottom on new message or typing state change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping]);
+
+  // Handle Document Selection
+  const handleSelectDoc = (doc) => {
+    if (selectedDocId === doc._id) return;
+    setSelectedDocId(doc._id);
+    setSelectedDoc(doc);
+    setInputValue('');
+  };
+
+  // Handle "New Chat" Button
+  const handleNewChat = () => {
+    setSelectedDocId(null);
+    setSelectedDoc(null);
+    setPreviewUrl(null);
+    setMessages([]);
+    setInputValue('');
+    if (showToast) showToast('New AI Chat session initialized', 'success');
+  };
+
+  // Handle Send Message
+  const handleSend = async (textToSend) => {
+    const questionText = typeof textToSend === 'string' ? textToSend : inputValue;
+    const trimmed = questionText.trim();
+
+    if (!trimmed || isTyping || !selectedDocId || isLocked) return;
+
+    // 1. Add User Message immediately (Optimistic UI)
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: trimmed,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue('');
+    setIsTyping(true);
+
+    try {
+      // 2. Call POST /documents/:id/chat with question
+      const res = await documentApi.askDocumentQuestion(selectedDocId, trimmed);
+
+      const aiAnswer = res?.answer || res?.data?.answer || 'No answer generated.';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          sender: 'ai',
+          text: aiAnswer,
+        },
+      ]);
+    } catch (err) {
+      console.error('AI Chat Question Error:', err);
+
+      let errorMessage = 'Something went wrong, please try again';
+      if (err?.status === 403 || isLocked) {
+        errorMessage = 'Unlock this document to use AI chat';
+      } else if (err?.message) {
+        errorMessage = err.message.includes('403')
+          ? 'Unlock this document to use AI chat'
+          : err.message;
       }
 
-      setMessages((prev) => [...prev, { sender: 'ai', text: aiResponseText, bullets: aiBullets }])
-    }, 1500)
-  }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: 'ai',
+          text: errorMessage,
+          isError: true,
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
 
-  const handleCopyCitation = () => {
-    const citationText = `@article{zhu2023hardware,
-  title={Hardware constraints for intermediate scale quantum processors},
-  author={Zhu, X. and Vane, J. and Richard, D.},
-  journal={Global Journal of Quantum Science},
-  volume={14},
-  number={2},
-  pages={112--128},
-  year={2023}
-}`
-    navigator.clipboard.writeText(citationText)
-      .then(() => {
-        if (showToast) showToast('BibTeX citation copied to clipboard!')
-      })
-      .catch((err) => {
-        console.error('Failed to copy text: ', err)
-      })
-  }
+  const handleDownload = async () => {
+    if (!selectedDocId || isLocked) return;
+    try {
+      const downloadRes = await documentApi.getDownloadUrl(selectedDocId);
+      const url = downloadRes?.url || downloadRes?.downloadUrl || selectedDoc?.fileUrl;
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        if (showToast) showToast('Download link not available', 'error');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      if (showToast) showToast('Failed to retrieve download link', 'error');
+    }
+  };
 
   return (
     <div className="flex-1 flex overflow-hidden h-[calc(100vh-64px)] select-none">
-
-      {/* Left Panel: Chat History / Document Selector */}
-      <aside className="w-[280px] bg-white border-r border-outline-variant flex flex-col h-full hidden lg:flex">
+      {/* Left Panel: Chat History / Recent Documents List */}
+      <aside className="w-[280px] bg-white border-r border-outline-variant flex flex-col h-full hidden lg:flex shrink-0">
         <div className="p-4">
           <button
-            onClick={() => {
-              setMessages([
-                {
-                  sender: 'ai',
-                  text: 'Hi there! I am ready to analyze a new document. Select a document or upload a new one to begin.',
-                  chips: ['Summarize Paper']
-                }
-              ])
-              if (showToast) showToast('New AI Chat session initialized')
-            }}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-white font-label-md text-label-md py-3 rounded-xl hover:shadow-lg active:scale-95 transition-all duration-150 cursor-pointer"
+            onClick={handleNewChat}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-white font-label-md text-label-md py-3 rounded-xl hover:shadow-lg active:scale-95 transition-all duration-150 cursor-pointer font-bold"
           >
             <span className="material-symbols-outlined text-[20px]">add_comment</span>
             New Chat
@@ -118,255 +274,388 @@ export default function AIChatPanel({ showToast }) {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-1">
-          <div className="px-3 py-2 text-label-sm font-label-sm text-text-muted uppercase tracking-wider font-bold">
+          <div className="px-3 py-2 text-label-sm font-label-sm text-text-muted uppercase tracking-wider font-bold text-xs">
             Recent Documents
           </div>
-          <a className="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary-container text-on-primary-container font-semibold transition-all" href="#doc">
-            <span className="material-symbols-outlined text-[20px]">description</span>
-            <span className="font-label-md text-label-md truncate">Quantum_Computing_V2.pdf</span>
-          </a>
-          <a className="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all" href="#doc">
-            <span className="material-symbols-outlined text-[20px]">article</span>
-            <span className="font-label-md text-label-md truncate">Market_Analysis_2024.docx</span>
-          </a>
-          <a className="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all" href="#doc">
-            <span className="material-symbols-outlined text-[20px]">biotech</span>
-            <span className="font-label-md text-label-md truncate">Bio_Informatics_Final.pdf</span>
-          </a>
-          <a className="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-all" href="#doc">
-            <span className="material-symbols-outlined text-[20px]">history</span>
-            <span className="font-label-md text-label-md truncate">Archived_Drafts_09.pdf</span>
-          </a>
+
+          {loadingDocs ? (
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 bg-surface-container-low rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : recentDocs.length === 0 ? (
+            <div className="p-4 text-center text-xs text-text-muted">
+              No recent documents found.
+            </div>
+          ) : (
+            recentDocs.map((doc) => {
+              const isSelected = selectedDocId === doc._id;
+              const iconName = getFileIcon(doc.fileFormat, doc.fileUrl);
+
+              return (
+                <button
+                  key={doc._id}
+                  onClick={() => handleSelectDoc(doc)}
+                  className={`w-full text-left group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-primary-container text-on-primary-container font-semibold shadow-sm border-l-4 border-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container-low'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px] shrink-0">
+                    {iconName}
+                  </span>
+                  <span className="font-label-md text-label-md truncate flex-1 text-sm">
+                    {doc.title || doc.originalFileName || 'Untitled Document'}
+                  </span>
+                  {doc.isLocked && (
+                    <span className="material-symbols-outlined text-[16px] text-amber-500 shrink-0">
+                      lock
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>
 
         <div className="p-4 border-t border-outline-variant bg-surface-container-lowest">
-          <div className="flex items-center gap-3 p-2 bg-surface-container-low rounded-xl">
-            <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <div className="flex items-center gap-3 p-2.5 bg-surface-container-low rounded-xl">
+            <span
+              className="material-symbols-outlined text-primary"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
               auto_awesome
             </span>
             <div className="flex-1">
-              <p className="font-label-sm text-label-sm text-text-main font-bold">AI Quota Used</p>
-              <div className="w-full h-1.5 bg-surface-container rounded-full mt-1.5 overflow-hidden">
-                <div className="bg-primary h-full w-3/4"></div>
-              </div>
+              <p className="font-label-sm text-label-sm text-text-main font-bold text-xs">
+                Eduflux AI Assistant
+              </p>
+              <p className="text-[11px] text-text-muted">
+                {selectedDoc ? 'Document Loaded' : 'Select a document'}
+              </p>
             </div>
-            <span className="text-xs text-text-muted font-bold">75%</span>
           </div>
         </div>
       </aside>
 
       {/* Main Chat Area */}
-      <section className="flex-1 flex flex-col bg-background relative h-full">
+      <section className="flex-1 flex flex-col bg-background relative h-full min-w-0">
         {/* Chat Feed */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-          <div className="flex justify-center">
-            <span className="bg-surface-container-high text-on-surface-variant px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-outline-variant/30">
-              Today
-            </span>
-          </div>
-
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex gap-4 max-w-2xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
-            >
-              {msg.sender === 'ai' ? (
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-white select-none">
-                  <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    auto_awesome
-                  </span>
-                </div>
-              ) : (
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-fixed border border-outline-variant overflow-hidden select-none">
-                  <img
-                    alt="User"
-                    className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVD3sebnTeVCiiBnpQFzuL83E_d0KAlWb2kSLObc4G9b7Q_TPoyOPZX2_xN_kpZ4pOjMFV-ytVtToQSlWxfhEefnWLCoDqXrlcK1ys7fMrAcZj8IPJ4UE2ze4u7x17EAKqpp2DIzIIWmU3cd7KDL1qFsMUxNxjLEOv883jHj-5DWaYEkxYW409uCBHBTn5JsYnoh5QYzreV6YrWqQe7kY_Y-EeJd-4FdNbs4XVRqaJVc0MjPo2U6q_cjndrUE6Z3gKwd-sumSCxmlK"
-                  />
-                </div>
-              )}
-
-              <div
-                className={`p-4 shadow-sm ${msg.sender === 'user'
-                    ? 'bg-text-main text-white rounded-[16px_16px_4px_16px]'
-                    : 'bg-[#f3f0ff] text-primary border border-[#e0d7ff] rounded-[16px_16px_16px_4px]'
-                  }`}
-              >
-                <p className="font-body-md text-body-md whitespace-pre-line leading-relaxed">{msg.text}</p>
-
-                {msg.bullets && (
-                  <ul className="list-disc ml-5 mt-2 space-y-1.5 font-body-sm text-body-sm">
-                    {msg.bullets.map((b, i) => (
-                      <li key={i} dangerouslySetInnerHTML={{ __html: b.replace(/<strong>(.*?)<\/strong>/g, '<b>$1</b>') }} />
-                    ))}
-                  </ul>
-                )}
-
-                {msg.chips && (
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    {msg.chips.map((chip, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(chip)}
-                        className="bg-white border border-outline-variant px-3 py-1 rounded-full text-label-sm font-label-sm text-primary hover:border-primary transition-colors cursor-pointer shadow-sm font-semibold"
-                      >
-                        {chip}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* Typing Indicator */}
-          {isTyping && (
-            <div className="flex gap-4 max-w-2xl items-center">
-              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-white">
-                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          {!selectedDocId ? (
+            /* Empty State: Prompt User to Select a Document */
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto my-auto space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner">
+                <span
+                  className="material-symbols-outlined text-3xl"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
                   auto_awesome
                 </span>
               </div>
-              <div className="flex space-x-1.5 items-center bg-surface-container-low px-4 py-3 rounded-full border border-outline-variant/20 shadow-sm">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              <div>
+                <h3 className="font-headline-sm text-lg font-bold text-text-main">
+                  Eduflux AI Chat
+                </h3>
+                <p className="text-sm text-text-muted mt-1.5 leading-relaxed">
+                  Select a document from your recent uploads on the left to start asking questions, summarizing contents, or extracting key concepts.
+                </p>
               </div>
-            </div>
-          )}
 
-          <div ref={chatEndRef} />
+              {/* Mobile / Inline Document Quick Selector */}
+              {recentDocs.length > 0 && (
+                <div className="w-full pt-4 space-y-2">
+                  <p className="text-xs font-bold text-text-muted uppercase tracking-wider text-left">
+                    Select a Recent Document:
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto custom-scrollbar text-left">
+                    {recentDocs.map((doc) => (
+                      <button
+                        key={doc._id}
+                        onClick={() => handleSelectDoc(doc)}
+                        className="flex items-center gap-3 p-3 bg-white border border-outline-variant rounded-xl hover:border-primary transition-all cursor-pointer text-left shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-primary text-xl">
+                          {getFileIcon(doc.fileFormat, doc.fileUrl)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-text-main truncate">
+                            {doc.title || 'Untitled Document'}
+                          </p>
+                          <p className="text-xs text-text-muted uppercase">
+                            {doc.fileFormat || 'PDF'}
+                          </p>
+                        </div>
+                        {doc.isLocked && (
+                          <span className="material-symbols-outlined text-sm text-amber-500">
+                            lock
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Selected Document Chat Messages */
+            <>
+              <div className="flex justify-center">
+                <span className="bg-surface-container-high text-on-surface-variant px-3.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-outline-variant/30 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-xs text-primary">
+                    description
+                  </span>
+                  {selectedDoc?.title || 'Document Active'}
+                </span>
+              </div>
+
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex gap-4 max-w-3xl ${
+                    msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''
+                  }`}
+                >
+                  {msg.sender === 'ai' ? (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-white select-none shadow-sm">
+                      <span
+                        className="material-symbols-outlined text-[20px]"
+                        style={{ fontVariationSettings: "'FILL' 1" }}
+                      >
+                        auto_awesome
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center select-none font-bold text-xs shadow-sm">
+                      <span className="material-symbols-outlined text-base">
+                        person
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    className={`p-4 shadow-sm text-sm leading-relaxed ${
+                      msg.sender === 'user'
+                        ? 'bg-text-main text-white rounded-[16px_16px_4px_16px]'
+                        : msg.isError
+                        ? 'bg-rose-50 text-rose-800 border border-rose-200 rounded-[16px_16px_16px_4px]'
+                        : 'bg-[#f3f0ff] text-primary border border-[#e0d7ff] rounded-[16px_16px_16px_4px]'
+                    }`}
+                  >
+                    <p className="font-body-md text-body-md whitespace-pre-wrap break-words">
+                      {msg.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Typing Indicator ("AI is thinking...") */}
+              {isTyping && (
+                <div className="flex gap-4 max-w-2xl items-center">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-white shadow-sm">
+                    <span
+                      className="material-symbols-outlined text-[20px]"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      auto_awesome
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-surface-container-low px-4 py-3 rounded-2xl border border-outline-variant/30 shadow-sm text-xs font-semibold text-text-muted">
+                    <span>AI is thinking</span>
+                    <div className="flex space-x-1 items-center">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </>
+          )}
         </div>
 
         {/* Input Bar Area */}
         <div className="p-6 bg-transparent border-t border-outline-variant/10">
-          <div className="max-w-4xl mx-auto bg-white/80 backdrop-blur-md border border-outline-variant rounded-2xl p-2 shadow-xl flex items-end gap-2">
-            <button className="p-3 text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-all cursor-pointer">
-              <span className="material-symbols-outlined">attach_file</span>
-            </button>
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend(inputValue)
-                }
-              }}
-              className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 px-2 font-body-md text-body-md max-h-32 custom-scrollbar outline-none"
-              placeholder="Message Eduflux AI..."
-              rows={1}
-            />
-            <button
-              onClick={() => handleSend(inputValue)}
-              className="p-3 bg-primary text-white rounded-xl hover:shadow-lg active:scale-95 transition-all duration-150 cursor-pointer flex items-center justify-center"
-            >
-              <span className="material-symbols-outlined">send</span>
-            </button>
+          <div className="max-w-4xl mx-auto bg-white/90 backdrop-blur-md border border-outline-variant rounded-2xl p-2 shadow-xl">
+            {isLocked ? (
+              <div className="p-3 text-center text-xs font-bold text-amber-800 bg-amber-50 rounded-xl flex items-center justify-center gap-2 border border-amber-200">
+                <span className="material-symbols-outlined text-base">lock</span>
+                <span>Unlock this document to use AI chat</span>
+              </div>
+            ) : !selectedDocId ? (
+              <div className="p-3 text-center text-xs font-medium text-text-muted bg-slate-50 rounded-xl">
+                Select a document from the left list to start asking questions.
+              </div>
+            ) : (
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend(inputValue);
+                    }
+                  }}
+                  disabled={isTyping || !selectedDocId || isLocked}
+                  className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 px-3 font-body-md text-body-md max-h-32 custom-scrollbar outline-none disabled:opacity-50 text-sm placeholder:text-text-muted"
+                  placeholder={`Ask anything about "${selectedDoc?.title || 'this document'}"...`}
+                  rows={1}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSend(inputValue)}
+                  disabled={!inputValue.trim() || isTyping || !selectedDocId || isLocked}
+                  className="p-3 bg-primary text-white rounded-xl hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 cursor-pointer flex items-center justify-center"
+                  title="Send Question"
+                >
+                  <span className="material-symbols-outlined text-xl">send</span>
+                </button>
+              </div>
+            )}
           </div>
-          <p className="text-center font-label-sm text-label-sm text-text-muted mt-3 select-none">
-            Eduflux AI can make mistakes. Verify important information with the original source.
+          <p className="text-center font-label-sm text-label-sm text-text-muted mt-3 select-none text-[11px]">
+            Eduflux AI processes document content securely. Press <kbd className="px-1 bg-slate-100 border rounded text-[10px]">Enter</kbd> to send.
           </p>
         </div>
       </section>
 
-      {/* Right Panel: Document Context & Metadata */}
-      <aside className="w-[320px] bg-white border-l border-outline-variant flex flex-col h-full hidden xl:flex overflow-y-auto custom-scrollbar p-6 justify-between">
-        <div className="space-y-6">
-          {/* Cover Preview Image */}
-          <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-outline-variant shadow-lg group select-none">
-            <img
-              alt="Document Preview"
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZ9G0e8awI4Ekd2YZFP5DiYBT-3O0965JMrAdjJe-tkNaGsM83a_VYsU4RPpeSsexE0UnfaGl_FqGatYIGonGgdhYALSnbChn0J8FAcoZxVFXEHYZjVvLyIYYpBiiuP2vAbHiCYRlq6p1lRJYYcNk_3w9Vw0l_fkjXGkzQvr0h9KAKwHhPrDhPxuZbSynVTZDrtyI6UCwIugkvq3b9vKAIhg3ukjGzyxc_DKKYj9dS55gGfcwmMcmmQHXprC8GbeSVwxCAD9n1WHi2"
-            />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200 cursor-zoom-in">
-              <span className="material-symbols-outlined text-white text-4xl">fullscreen</span>
-            </div>
-          </div>
-
-          <div className="w-full space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-headline-sm text-[16px] text-text-main truncate font-bold flex-1 mr-2">
-                Quantum_Computing_V2
-              </h3>
-              <span className="bg-academic-blue/10 text-academic-blue font-label-sm text-[11px] px-2 py-0.5 rounded uppercase font-bold select-none">
-                PDF
-              </span>
-            </div>
-
-            {/* Page Navigator */}
-            <div className="flex items-center justify-between bg-surface-container-low p-2 rounded-lg select-none">
-              <button
-                onClick={() => activePage > 1 && setActivePage(activePage - 1)}
-                className="p-1 hover:bg-surface-container-high rounded-md transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-              </button>
-              <div className="flex items-center gap-1 font-label-md text-label-md font-semibold">
-                <span className="text-primary font-bold">{activePage}</span>
-                <span className="text-text-muted">/</span>
-                <span className="text-text-muted">{totalPages}</span>
-              </div>
-              <button
-                onClick={() => activePage < totalPages && setActivePage(activePage + 1)}
-                className="p-1 hover:bg-surface-container-high rounded-md transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-              </button>
-            </div>
-
-            {/* Quick Document Actions */}
-            <div className="space-y-2 select-none">
-              <button className="w-full flex items-center justify-between px-4 py-3 bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md rounded-xl transition-all cursor-pointer border-none font-semibold">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">swap_horiz</span>
-                  Switch Document
+      {/* Right Panel: Document Preview & Context Metadata */}
+      <aside className="w-[320px] bg-white border-l border-outline-variant flex flex-col h-full hidden xl:flex overflow-y-auto custom-scrollbar p-6 justify-between shrink-0">
+        {selectedDoc ? (
+          <div className="space-y-6">
+            {/* Real Cover Preview Image */}
+            <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-outline-variant shadow-md bg-surface-container-low flex items-center justify-center group select-none">
+              {loadingPreview ? (
+                <div className="flex flex-col items-center gap-2 text-text-muted text-xs">
+                  <span className="material-symbols-outlined animate-spin text-2xl">
+                    sync
+                  </span>
+                  <span>Loading Preview...</span>
                 </div>
-                <span className="material-symbols-outlined">keyboard_arrow_right</span>
-              </button>
-              <button className="w-full flex items-center justify-between px-4 py-3 bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md rounded-xl transition-all cursor-pointer border-none font-semibold">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">download</span>
-                  Download PDF
+              ) : previewUrl && (previewUrl.endsWith('.png') || previewUrl.endsWith('.jpg') || previewUrl.endsWith('.jpeg') || previewUrl.includes('preview')) ? (
+                <img
+                  alt={selectedDoc.title || 'Document Preview'}
+                  className="w-full h-full object-cover"
+                  src={previewUrl}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-primary">
+                  <span className="material-symbols-outlined text-6xl mb-2">
+                    {getFileIcon(selectedDoc.fileFormat, selectedDoc.fileUrl)}
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                    {selectedDoc.fileFormat || 'DOCUMENT'}
+                  </span>
                 </div>
-              </button>
-            </div>
+              )}
 
-            {/* Key Topics Tag list */}
-            <div className="pt-4 border-t border-outline-variant select-none">
-              <p className="font-label-sm text-label-sm text-text-muted mb-2 font-bold">Key Topics in this Section</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2.5 py-1 bg-academic-gold/10 text-academic-gold rounded text-[10px] font-extrabold uppercase tracking-wide border border-academic-gold/20">
-                  Coherence
-                </span>
-                <span className="px-2.5 py-1 bg-academic-red/10 text-academic-red rounded text-[10px] font-extrabold uppercase tracking-wide border border-academic-red/20">
-                  Scalability
-                </span>
-                <span className="px-2.5 py-1 bg-tertiary-container/10 text-tertiary rounded text-[10px] font-extrabold uppercase tracking-wide border border-tertiary/20">
-                  Dilution
+              {/* View Full Document Action Overlay */}
+              <div
+                onClick={() => navigate(`/documents/${selectedDoc._id}/view`)}
+                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-white text-3xl">
+                  open_in_new
                 </span>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Citation Box */}
-        <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 select-none">
-          <p className="font-label-sm text-label-sm text-primary mb-2 font-extrabold uppercase tracking-widest">
-            Research Citation
-          </p>
-          <p className="font-body-sm text-body-sm text-on-surface italic leading-relaxed">
-            "Zhu, X. et al. (2023). Hardware constraints for intermediate scale quantum processors."
-          </p>
-          <button
-            onClick={handleCopyCitation}
-            className="mt-3 text-primary font-label-sm text-label-sm hover:underline flex items-center gap-1 cursor-pointer font-bold bg-transparent border-none"
-          >
-            Copy BibTeX <span className="material-symbols-outlined text-[16px]">content_copy</span>
-          </button>
-        </div>
+            <div className="w-full space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-headline-sm text-[15px] text-text-main truncate font-bold flex-1">
+                  {selectedDoc.title || 'Untitled Document'}
+                </h3>
+                <span className="bg-academic-blue/10 text-academic-blue font-label-sm text-[11px] px-2 py-0.5 rounded uppercase font-bold select-none shrink-0">
+                  {selectedDoc.fileFormat || 'PDF'}
+                </span>
+              </div>
+
+              {/* Document Quick Details */}
+              <div className="bg-surface-container-low p-3.5 rounded-xl space-y-2 select-none text-xs text-text-muted">
+                <div className="flex justify-between items-center">
+                  <span>Category:</span>
+                  <span className="font-bold text-text-main">
+                    {selectedDoc.category || 'Academic'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>File Size:</span>
+                  <span className="font-bold text-text-main">
+                    {formatFileSize(selectedDoc.fileSize)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Status:</span>
+                  <span
+                    className={`font-bold ${
+                      isLocked ? 'text-amber-600' : 'text-emerald-600'
+                    }`}
+                  >
+                    {isLocked ? 'Locked' : 'Unlocked'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="space-y-2 select-none">
+                <button
+                  onClick={() => navigate(`/documents/${selectedDoc._id}/view`)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-[#f3f0ff] hover:bg-[#eadeff] text-primary font-label-md text-label-md rounded-xl transition-all cursor-pointer border-none font-bold text-xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-base">
+                      visibility
+                    </span>
+                    View Full Document
+                  </div>
+                  <span className="material-symbols-outlined text-base">
+                    arrow_forward
+                  </span>
+                </button>
+
+                <button
+                  disabled={isLocked}
+                  onClick={handleDownload}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-label-md text-label-md transition-all text-xs font-bold ${
+                    isLocked
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-base">
+                      {isLocked ? 'lock' : 'download'}
+                    </span>
+                    {isLocked ? 'Download (Locked)' : 'Download Document'}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-text-muted">
+            <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
+              article
+            </span>
+            <p className="text-xs font-medium">
+              No Document Selected
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Choose a document from the left sidebar to view details and preview.
+            </p>
+          </div>
+        )}
       </aside>
     </div>
-  )
+  );
 }

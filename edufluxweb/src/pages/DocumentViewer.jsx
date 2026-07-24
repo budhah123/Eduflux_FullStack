@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { documentApi } from '../services/api/documentApi';
 import { useViewDocument } from '../hooks/useViewDocument';
+import DocumentChatPanel from '../components/DocumentChatPanel';
 import mammoth from 'mammoth/mammoth.browser';
 import { Document as PdfDocument, Page as PdfPage, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -1190,6 +1191,13 @@ export default function DocumentViewer({
           </aside>
         </div>
       </main>
+
+      {/* AI Document Chat Panel */}
+      <DocumentChatPanel
+        documentId={id}
+        isLocked={isLocked}
+        title={docData?.title}
+      />
     </div>
   );
 }

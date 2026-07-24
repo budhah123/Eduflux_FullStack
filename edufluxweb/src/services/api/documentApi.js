@@ -113,4 +113,9 @@ export const documentApi = {
   getCurrentUser: async () => {
     return apiClient.get('/users/me');
   },
+
+  // POST /documents/:id/chat
+  askDocumentQuestion: async (id, question) => {
+    return apiClient.post(`/documents/${id}/chat`, { question });
+  },
 };
