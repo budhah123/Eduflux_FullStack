@@ -34,6 +34,7 @@ import {
 import { GoogleOAuthGuard } from './guards/google-oauth.guards';
 import { UpdatePasswordInput } from './dto/update-password.input';
 import { AtGuard, CurrentUser } from './decorator';
+import { AuthType } from './enum/auth-type.enum';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -58,7 +59,13 @@ export class AuthController {
         `User with email: ${email} already exists!`,
       );
     }
-    return await this.userService.createUser(registerInput);
+    const user = await this.userService.createUser(registerInput);
+
+    await this.authService.generateAuthTokenAndSendVerificationCode(
+      user,
+      AuthType.EMAIL,
+    );
+    return user;
   }
 
   @Post('login')
@@ -71,7 +78,36 @@ export class AuthController {
   async login(@Body() loginInput: LoginInput): Promise<LoginOutput> {
     const { email, password } = loginInput;
     const user = await this.authService.validateUser(email, password);
+
+    if (!user.isVerified) {
+      // ← add this check
+      throw new BadRequestException(
+        'Please verify your email before logging in',
+      );
+    }
     return await this.authService.generateTokens(user);
+  }
+
+  @Post('verify-email')
+  @ApiOperation({ summary: 'Verify email with OTP' })
+  async verifyEmail(@Body() dto: VerifyOtpInput) {
+    const { email, token } = dto;
+    await this.authService.verifyEmail(email, token);
+    return { message: 'Email verified successfully' };
+  }
+
+  @Post('resend-verification')
+  @ApiOperation({ summary: 'Resend email verification OTP' })
+  async resendVerification(@Body() dto: CheckUserInput) {
+    const user = await this.userService.getUser({ email: dto.email });
+    if (!user) throw new BadRequestException('User not found');
+    if (user.isVerified) return { message: 'Email already verified' };
+
+    await this.authService.generateAuthTokenAndSendVerificationCode(
+      user,
+      AuthType.EMAIL,
+    );
+    return { message: 'Verification code resent' };
   }
 
   @AtGuard()

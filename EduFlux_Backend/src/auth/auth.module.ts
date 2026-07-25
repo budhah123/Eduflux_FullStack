@@ -13,6 +13,7 @@ import googleOauthConfig from './config/google-oauth.config';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { Type } from 'class-transformer';
 import { AuthTokenEntity } from './entity';
+import { MailModule } from '@app/mail';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthTokenEntity } from './entity';
       useFactory: jwtModuleOptions,
     }),
     ConfigModule.forFeature(googleOauthConfig),
+    MailModule
   ],
   controllers: [AuthController],
   providers: [

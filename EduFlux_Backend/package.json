@@ -43,6 +43,7 @@
     "mongodb": "^6.21.0",
     "multer": "^2.1.1",
     "nanoid": "^5.1.6",
+    "nodemailer": "^9.0.3",
     "ollama": "^0.6.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
@@ -65,6 +66,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^8.0.1",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pdf-parse": "^1.1.5",
     "@types/streamifier": "^0.1.2",
@@ -111,6 +113,7 @@
       "^@app/access(|/.*)$": "<rootDir>/libs/access/src/$1",
       "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@app/file-upload(|/.*)$": "<rootDir>/libs/file-upload/src/$1",
+      "^@app/mail(|/.*)$": "<rootDir>/libs/mail/src/$1",
       "^@app/swagger(|/.*)$": "<rootDir>/libs/swagger/src/$1",
       "^src/(.*)$": "<rootDir>/src/$1"
     }

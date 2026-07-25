@@ -45,6 +45,12 @@
       "@app/file-upload/*": [
         "libs/file-upload/src/*"
       ],
+      "@app/mail": [
+        "libs/mail/src"
+      ],
+      "@app/mail/*": [
+        "libs/mail/src/*"
+      ],
       "@app/swagger": [
         "libs/swagger/src"
       ],

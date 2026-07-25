@@ -84,6 +84,14 @@ export class UserEntity extends CommonAttribute {
   @Column('int', { name: 'unlockCredits', default: 0 })
   unlockCredits: number = 0;
 
+  @ApiProperty({
+    description: 'Whether the user has verified their email',
+    type: Boolean,
+    example: false,
+  })
+  @Column('boolean', { name: 'isVerified', default: false })
+  isVerified: boolean = false;
+
   @BeforeInsert()
   async hashedPassword() {
     // Only hash password if it exists (skip for OAuth users)
