@@ -18,6 +18,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 
 import { ObjectId } from 'mongodb';
+import { MailService } from '@app/mail';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,7 @@ export class AuthService {
     private readonly jwtConfigService: JwtConfigService,
     @InjectRepository(AuthTokenEntity)
     private readonly authTokenRepository: MongoRepository<AuthTokenEntity>,
+    private readonly mailService: MailService,
   ) {}
 
   private generateNumericOtp(length = 6): string {
@@ -225,6 +227,13 @@ export class AuthService {
         }),
       );
     }
+
+    if (authType === AuthType.EMAIL && user.email) {
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        verificationCode,
+      );
+    }
     return user;
   }
 
@@ -244,5 +253,24 @@ export class AuthService {
       throw new BadRequestException('Invalid token');
     }
     return authToken;
+  }
+
+  async verifyEmail(email: string, token: string) {
+    const authToken = await this.verifyOtp(
+      email,
+      token,
+      AuthTokenType.EMAIL_VERIFICATION_TOKEN,
+    );
+
+    const user = await this.userService.getUser({ email: email });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.userService.updateUser(user._id.toString(), {
+      isVerified: true,
+    });
+    await this.authTokenRepository.delete(authToken._id);
+
+    return 'Email verified successfully';
   }
 }

@@ -14,6 +14,7 @@
     "^@app/access(|/.*)$": "<rootDir>/../libs/access/src/$1",
     "^@app/database(|/.*)$": "<rootDir>/../libs/database/src/$1",
     "^@app/file-upload(|/.*)$": "<rootDir>/../libs/file-upload/src/$1",
+    "^@app/mail(|/.*)$": "<rootDir>/../libs/mail/src/$1",
     "^@app/swagger(|/.*)$": "<rootDir>/../libs/swagger/src/$1",
     "^src/(.*)$": "<rootDir>/../src/$1"
   }
