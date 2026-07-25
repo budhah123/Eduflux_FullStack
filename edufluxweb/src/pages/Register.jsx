@@ -60,12 +60,12 @@ export default function Register() {
         throw new Error(errMsg)
       }
 
-      showToast('Registration completed successfully')
-      setSuccess('Account created successfully! Redirecting to login...')
+      showToast('Registration completed! Please verify your email.', 'info')
+      setSuccess('Account created successfully! Redirecting to email verification...')
       
       setTimeout(() => {
-        navigate('/login')
-      }, 1500)
+        navigate('/verify-email', { state: { email } })
+      }, 1200)
     } catch (err) {
       setError(err.message)
     } finally {

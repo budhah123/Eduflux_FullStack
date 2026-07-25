@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import Dashboard from './pages/Dashboard'
 import DocumentViewer from './pages/DocumentViewer'
 import DocumentViewerComparison from './pages/DocumentViewerComparison'
@@ -26,6 +27,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/my-upload" element={<Dashboard />} />
           <Route path="/browse-panel" element={<Dashboard />} />

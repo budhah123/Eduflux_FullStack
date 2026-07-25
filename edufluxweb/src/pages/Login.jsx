@@ -1,16 +1,27 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { showToast } = useToast()
-  const [email, setEmail] = useState('')
+
+  const initialEmail = location.state?.email || ''
+  const initialMessage = location.state?.message || ''
+
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [success, setSuccess] = useState(initialMessage)
+
+  useEffect(() => {
+    if (initialMessage) {
+      showToast(initialMessage, 'info')
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -24,13 +35,25 @@ export default function Login() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
         const errMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Login failed')
+        
+        // Handle unverified email specific error
+        if (
+          errMsg.toLowerCase().includes('verify your email') ||
+          errMsg.toLowerCase().includes('email before logging in') ||
+          response.status === 400 && errMsg.includes('verify')
+        ) {
+          showToast('Please verify your email before logging in.', 'info')
+          navigate('/verify-email', { state: { email: email.trim(), fromLogin: true } })
+          return
+        }
+
         throw new Error(errMsg)
       }
 
