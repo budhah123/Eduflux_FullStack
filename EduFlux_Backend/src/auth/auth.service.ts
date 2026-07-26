@@ -103,6 +103,7 @@ export class AuthService {
     return await this.userService.createUser({
       ...googleUser,
       isActive: true,
+      isVerified: true,
     });
   }
 
