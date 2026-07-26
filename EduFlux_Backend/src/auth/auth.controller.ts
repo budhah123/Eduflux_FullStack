@@ -9,6 +9,7 @@ import {
   BadRequestException,
   UseGuards,
   Req,
+  Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -35,6 +36,7 @@ import { GoogleOAuthGuard } from './guards/google-oauth.guards';
 import { UpdatePasswordInput } from './dto/update-password.input';
 import { AtGuard, CurrentUser } from './decorator';
 import { AuthType } from './enum/auth-type.enum';
+import type { Response } from 'express';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -137,12 +139,15 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
-  async googleLoginCallback(@Req() req: any) {
+  async googleLoginCallback(@Req() req: any, @Res() res: Response) {
     if (!req.user) {
       throw new BadRequestException('Google authentication failed');
     }
-    const response = await this.authService.generateTokens(req.user);
-    return response;
+    const tokens = await this.authService.generateTokens(req.user);
+
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/auth/google/success?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
+    );
   }
 
   @AtGuard()
