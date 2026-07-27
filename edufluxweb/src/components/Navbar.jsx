@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../services/api/apiClient';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -236,14 +237,17 @@ export default function Navbar() {
           {authLoading ? (
             <div className="h-10 w-[176px] rounded-lg bg-surface-container/80 animate-pulse" />
           ) : userProfile ? (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((prev) => !prev)}
-                className="flex items-center gap-3"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-              >
+            <div className="flex items-center gap-2 sm:gap-3">
+              <NotificationBell />
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-3"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                >
                 {userProfile.avatarUrl ? (
                   <img
                     src={userProfile.avatarUrl}
@@ -296,6 +300,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+          </div>
           ) : (
             <>
               <Link

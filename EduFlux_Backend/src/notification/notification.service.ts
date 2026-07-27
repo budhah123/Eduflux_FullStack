@@ -9,7 +9,7 @@ export class NotificationService {
   constructor(
     @InjectRepository(NotificationEntity)
     private readonly notificationRepository: MongoRepository<NotificationEntity>,
-  ) {}
+  ) { }
 
   // notification.service.ts
   async createNotification(
@@ -47,10 +47,12 @@ export class NotificationService {
     });
   }
 
+  // notification.service.ts
   async getUnreadCount(userId: string): Promise<number> {
     return await this.notificationRepository.count({
-      where: { userId, isRead: false },
-    });
+      userId,
+      isRead: false,
+    }); // ← no `where` wrapper, pass fields directly
   }
 
   async markAsRead(id: string, userId: string) {

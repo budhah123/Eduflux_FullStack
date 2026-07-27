@@ -2,8 +2,117 @@ import React, { useState, useEffect } from 'react';
 import { documentApi } from '../services/api/documentApi';
 import { useToast } from '../context/ToastContext';
 
+const STATUS_CONFIG = {
+  pending: {
+    label: 'Pending',
+    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-100',
+    dotClass: 'bg-amber-500',
+  },
+  approved: {
+    label: 'Approved',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100',
+    dotClass: 'bg-emerald-500',
+  },
+  rejected: {
+    label: 'Rejected',
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80 hover:bg-rose-100',
+    dotClass: 'bg-rose-500',
+  },
+  published: {
+    label: 'Published',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200/80 hover:bg-blue-100',
+    dotClass: 'bg-blue-500',
+  },
+};
+
+function DocumentStatusSelect({ docId, currentStatus, onStatusUpdated }) {
+  const { showToast } = useToast();
+  const [updating, setUpdating] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState(
+    (currentStatus || 'pending').toLowerCase(),
+  );
+
+  useEffect(() => {
+    if (currentStatus) {
+      setSelectedStatus(currentStatus.toLowerCase());
+    }
+  }, [currentStatus]);
+
+  const handleChange = async (e) => {
+    const newStatus = e.target.value;
+    const prevStatus = selectedStatus;
+
+    if (newStatus === prevStatus) return;
+
+    setSelectedStatus(newStatus);
+    setUpdating(true);
+
+    try {
+      await documentApi.adminChangeStatus(docId, newStatus);
+      showToast(
+        `Status updated to "${STATUS_CONFIG[newStatus]?.label || newStatus}"`,
+      );
+      if (onStatusUpdated) {
+        onStatusUpdated(docId, newStatus);
+      }
+    } catch (err) {
+      setSelectedStatus(prevStatus);
+      showToast(err.message || 'Failed to update status', 'error');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const activeConfig = STATUS_CONFIG[selectedStatus] || STATUS_CONFIG.pending;
+
+  return (
+    <div className="relative inline-flex items-center">
+      <select
+        value={selectedStatus}
+        onChange={handleChange}
+        disabled={updating}
+        aria-label="Document status"
+        className={`appearance-none pl-6 pr-7 py-1 rounded-full text-xs font-bold border transition-all duration-150 cursor-pointer outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60 disabled:cursor-not-allowed ${activeConfig.badgeClass}`}
+      >
+        <option value="pending" className="bg-white text-slate-800 font-semibold py-1">
+          Pending
+        </option>
+        <option value="approved" className="bg-white text-slate-800 font-semibold py-1">
+          Approved
+        </option>
+        <option value="rejected" className="bg-white text-slate-800 font-semibold py-1">
+          Rejected
+        </option>
+        <option value="published" className="bg-white text-slate-800 font-semibold py-1">
+          Published
+        </option>
+      </select>
+
+      {/* Colored status dot */}
+      <span
+        className={`absolute left-2.5 w-1.5 h-1.5 rounded-full pointer-events-none ${activeConfig.dotClass}`}
+      />
+
+      {/* Trailing chevron / loading spinner */}
+      <span className="absolute right-2 text-slate-400 pointer-events-none flex items-center justify-center">
+        {updating ? (
+          <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <span className="material-symbols-outlined text-[14px]">expand_more</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 export default function AdminDocumentManagement() {
   const { showToast } = useToast();
+
+  const handleStatusUpdated = (docId, newStatus) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (doc._id === docId ? { ...doc, status: newStatus } : doc)),
+    );
+  };
   
   // State management
   const [documents, setDocuments] = useState([]);
@@ -476,16 +585,11 @@ export default function AdminDocumentManagement() {
                         </td>
                         <td className="px-6 py-4 text-sm text-center font-bold">{doc.downloadCount || 0}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                            doc.status === 'published'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              doc.status === 'published' ? 'bg-emerald-600' : 'bg-amber-600'
-                            }`}></span>
-                            {doc.status === 'published' ? 'Published' : doc.status === 'flagged' ? 'Flagged' : doc.status || 'Pending'}
-                          </span>
+                          <DocumentStatusSelect
+                            docId={doc._id}
+                            currentStatus={doc.status}
+                            onStatusUpdated={handleStatusUpdated}
+                          />
                         </td>
                         <td className="px-6 py-4 text-right relative">
                           <button 
