@@ -6,17 +6,18 @@ import { DocumentEntity } from './entity';
 import { FileUploadModule } from '@app/file-upload';
 import { UserModule } from '../user/user.module';
 import { AccessModule } from '@app/access';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([DocumentEntity]),
     FileUploadModule,
     UserModule,
-    AccessModule
+    AccessModule,
+    NotificationModule,
   ],
   providers: [DocumentsService],
   controllers: [DocumentsController],
   exports: [DocumentsService],
 })
 export class DocumentsModule {}
-

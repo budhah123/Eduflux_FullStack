@@ -151,7 +151,6 @@ export class AdminDocumentController {
     return this.documentService.deleteAsAdmin(id);
   }
   @Patch(':id/status')
-  @AdminAtGuard()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Admin: change document status' })
   @ApiParam({
