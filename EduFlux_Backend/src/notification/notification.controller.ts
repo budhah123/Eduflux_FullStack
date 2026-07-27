@@ -23,7 +23,7 @@ import { PaginationInput } from 'src/common/pagination';
 @AtGuard()
 @Controller('notification')
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(private readonly notificationService: NotificationService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all notifications for the authenticated user' })
@@ -58,9 +58,11 @@ export class NotificationController {
     type: 'number',
   })
   async getUnreadCount(@Req() req) {
+    console.log('[getUnreadCount] req.user._id:', req.user._id.toString()); // ← add this temporarily
     const count = await this.notificationService.getUnreadCount(
       req.user._id.toString(),
     );
+    console.log('[getUnreadCount] count result:', count); // ← add this too
     return { count };
   }
 

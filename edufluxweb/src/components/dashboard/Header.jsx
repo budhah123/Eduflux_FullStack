@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../../services/api/apiClient';
+import NotificationBell from '../NotificationBell';
 
 export default function Header({ activeTab, setMobileOpen, onSearch }) {
   const [userRole, setUserRole] = useState('Student User');
@@ -63,12 +64,7 @@ export default function Header({ activeTab, setMobileOpen, onSearch }) {
       {/* Right side items */}
       <div className="flex items-center gap-2">
         {/* Notification Bell */}
-        <div className="p-2 hover:bg-surface-container-high rounded-full cursor-pointer relative group transition-all">
-          <span className="material-symbols-outlined text-on-surface-variant">
-            notifications
-          </span>
-          <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
-        </div>
+        <NotificationBell />
 
         {/* Help Button */}
         <div className="p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-all">

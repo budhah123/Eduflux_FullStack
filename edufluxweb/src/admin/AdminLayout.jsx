@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
+import NotificationBell from '../components/NotificationBell';
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -191,10 +192,7 @@ export default function AdminLayout() {
               type="text"
             />
           </div>
-          <button className="hover:bg-slate-200 p-2 rounded-full transition-colors relative">
-            <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba1a1a] rounded-full"></span>
-          </button>
+          <NotificationBell />
           <button className="hover:bg-slate-200 p-2 rounded-full transition-colors">
             <span className="material-symbols-outlined">help</span>
           </button>
