@@ -14,6 +14,8 @@ import { FilterDocumentDto } from './dto/filter-document.dto';
 import { ObjectId } from 'mongodb';
 import { UserService } from '../user/user.service';
 import { DocumentStatus } from './enum';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enum';
 
 @Injectable()
 export class DocumentsService {
@@ -22,6 +24,7 @@ export class DocumentsService {
     private readonly documentRepository: MongoRepository<DocumentEntity>,
     private readonly fileUploadService: FileUploadService,
     private readonly userService: UserService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ─── CREATE ───────────────────────────────────────────
@@ -319,13 +322,57 @@ export class DocumentsService {
     id: string,
     status: DocumentStatus,
   ): Promise<DocumentEntity> {
-    const result = await this.documentRepository.update(
+    const doc = await this.findById(id);
+
+    const result = await this.documentRepository.updateOne(
       { _id: new ObjectId(id) },
-      { status },
+      { $set: { status } },
     );
-    if (result.affected === 0) {
+
+    if (result.matchedCount === 0) {
       throw new NotFoundException(`Document ${id} not found`);
     }
+
+    if (doc.userId) {
+      if (status === DocumentStatus.APPROVED) {
+        await this.notificationService.createNotification({
+          userId: doc.userId.toString(),
+          type: NotificationType.DOCUMENT_APPROVED,
+          title: 'Document Approved',
+          message: `Your document "${doc.title}" has been approved and is now live.`,
+          link: `/documents/${doc._id}`,
+        });
+
+        const user = await this.userService.getUser({
+          _id: new ObjectId(doc.userId),
+        });
+
+        if (user) {
+          const newCount = (user.approvedUploadCount || 0) + 1;
+          const updateData: any = { approvedUploadCount: newCount };
+
+          if (newCount % 3 === 0) {
+            updateData.unlockCredits = (user.unlockCredits || 0) + 1;
+            await this.notificationService.createNotification({
+              userId: doc.userId.toString(),
+              type: NotificationType.UNLOCK_CREDIT_EARNED,
+              title: 'Unlock Credit Earned!',
+              message: 'You earned 1 unlock credit for approved uploads.',
+            });
+          }
+
+          await this.userService.updateUser(doc.userId, updateData);
+        }
+      } else if (status === DocumentStatus.REJECTED) {
+        await this.notificationService.createNotification({
+          userId: doc.userId.toString(),
+          type: NotificationType.DOCUMENT_REJECTED,
+          title: 'Document Rejected',
+          message: `Your document "${doc.title}" was not approved.`,
+        });
+      }
+    }
+
     return this.findById(id);
   }
 

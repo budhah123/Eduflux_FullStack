@@ -12,6 +12,8 @@ import { ObjectId } from 'mongodb';
 import { PaymentProvider } from 'src/subscription/enum/payment-provider.enum';
 import { PlanType } from 'src/subscription/enum/plan-type.enum';
 import { SubscriptionStatus } from 'src/subscription/enum/subscription-status.enum';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enum';
 
 @Injectable()
 export class PaymentService {
@@ -21,6 +23,7 @@ export class PaymentService {
     private subscriptionRepository: MongoRepository<SubscriptionEntity>,
     @InjectRepository(UserEntity)
     private userRepository: MongoRepository<UserEntity>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ================= INITIATE =================
@@ -113,7 +116,9 @@ export class PaymentService {
         }),
       );
       const status = res.data?.status?.toUpperCase();
-      return status === 'COMPLETE' || status === 'COMPLETED' || status === 'SUCCESS';
+      return (
+        status === 'COMPLETE' || status === 'COMPLETED' || status === 'SUCCESS'
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.warn('eSewa API verification warning:', errorMessage);
@@ -125,7 +130,9 @@ export class PaymentService {
   // ================= ACTIVATE SUBSCRIPTION =================
   async activateSubscription(userId: string, dto: VerifyPaymentDto) {
     const userIdStr = userId.toString();
-    const userObjId = ObjectId.isValid(userIdStr) ? new ObjectId(userIdStr) : userIdStr;
+    const userObjId = ObjectId.isValid(userIdStr)
+      ? new ObjectId(userIdStr)
+      : userIdStr;
 
     const user = await this.userRepository.findOne({
       where: { _id: userObjId } as any,
@@ -168,6 +175,17 @@ export class PaymentService {
     sub.paymentProvider = dto.provider;
     sub.transactionId = dto.pidx ?? dto.transactionUuid;
 
-    return this.subscriptionRepository.save(sub);
+    const savedSub = this.subscriptionRepository.save(sub);
+
+    // ← NEW: notify user
+    await this.notificationService.createNotification({
+      userId: userId,
+      type: NotificationType.PAYMENT_SUCCESS,
+      title: 'Subscription Activated',
+      message: `Your ${dto.planType} subscription is now active until ${expiry.toDateString()}.`,
+      link: '/subscription',
+    });
+
+    return savedSub;
   }
 }

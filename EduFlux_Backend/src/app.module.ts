@@ -10,6 +10,8 @@ import { DocumentsModule } from './documents/documents.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
 import { DocumentChatModule } from './document-chat/document-chat.module';
+import { NotificationModule } from './notification/notification.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { DocumentChatModule } from './document-chat/document-chat.module';
     SubscriptionModule,
     PaymentModule,
     DocumentChatModule,
+    NotificationModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],
