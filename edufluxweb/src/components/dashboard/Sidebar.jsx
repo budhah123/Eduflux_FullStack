@@ -89,7 +89,7 @@ export default function Sidebar({
     { name: 'Browse', label: 'Browse', icon: 'search', route: '/browse-panel' },
     { name: 'My Uploads', label: 'My Uploads', icon: 'upload_file', route: '/my-upload' },
     { name: 'AI Chat', label: 'AI Chat', icon: 'auto_awesome', route: '/ai-chat' },
-    { name: 'Bookmarks', label: 'Bookmarks', icon: 'bookmark' },
+    { name: 'Bookmarks', label: 'Bookmarks', icon: 'bookmark', route: '/bookmarks' },
     {
       name: 'Subscription',
       label: 'Subscription',

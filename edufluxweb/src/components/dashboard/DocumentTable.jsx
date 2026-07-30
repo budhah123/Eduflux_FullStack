@@ -1,5 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { bookmarkApi } from '../../services/api/bookmarkApi';
+import BookmarkButton from '../BookmarkButton';
 
 export default function DocumentTable({
   documents,
@@ -15,6 +17,39 @@ export default function DocumentTable({
   showToast,
 }) {
   const navigate = useNavigate();
+  const [bookmarkedIds, setBookmarkedIds] = useState([]);
+
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      try {
+        const res = await bookmarkApi.getBookmarks();
+        const items = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        const ids = items.map((b) => String(b.documentId || b.document?._id || b.document?.id || b._id || b.id));
+        setBookmarkedIds(ids);
+      } catch (err) {
+        console.error('Error fetching bookmarks in DocumentTable:', err);
+      }
+    };
+    fetchBookmarks();
+  }, []);
+
+  const handleToggleBookmark = async (docId, nextState) => {
+    const idStr = String(docId);
+    try {
+      if (nextState) {
+        await bookmarkApi.addBookmark(idStr);
+        setBookmarkedIds((prev) => [...prev, idStr]);
+        if (showToast) showToast('Saved to bookmarks', 'success');
+      } else {
+        await bookmarkApi.removeBookmark(idStr);
+        setBookmarkedIds((prev) => prev.filter((id) => id !== idStr));
+        if (showToast) showToast('Removed from bookmarks', 'info');
+      }
+    } catch (err) {
+      console.error('Error toggling bookmark:', err);
+      if (showToast) showToast(err.message || 'Failed to update bookmark', 'error');
+    }
+  };
 
   const handlePreviewClick = useCallback((doc) => {
     navigate(`/documents/${doc._id}/view`);
@@ -153,6 +188,12 @@ export default function DocumentTable({
                   </td>
                   <td className="px-6 py-4 text-right select-none">
                     <div className="flex justify-end gap-1">
+                      <BookmarkButton
+                        documentId={doc._id}
+                        isBookmarked={bookmarkedIds.includes(String(doc._id))}
+                        onToggle={(id, state) => handleToggleBookmark(id, state)}
+                        variant="table"
+                      />
                       <button
                         onClick={() => onEdit(doc)}
                         className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-primary transition-colors cursor-pointer"

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { documentApi } from '../../services/api/documentApi'
+import { bookmarkApi } from '../../services/api/bookmarkApi'
+import BookmarkButton from '../BookmarkButton'
 import { useToast } from '../../context/ToastContext'
 
 
@@ -13,7 +15,7 @@ export default function BrowsePanel() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('All Subjects')
   const [selectedFileType, setSelectedFileType] = useState('All')
-  const [bookmarkedIds, setBookmarkedIds] = useState([1, 4]) // initial bookmarked items
+  const [bookmarkedIds, setBookmarkedIds] = useState([]) // user bookmarked document IDs
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [dbDocuments, setDbDocuments] = useState([])
   const [loading, setLoading] = useState(false)
@@ -73,11 +75,36 @@ export default function BrowsePanel() {
     return () => clearTimeout(timer)
   }, [searchQuery, selectedSubject, selectedCategory, sortBy, page, limit])
 
-  const toggleBookmark = (id) => {
-    if (bookmarkedIds.includes(id)) {
-      setBookmarkedIds(bookmarkedIds.filter(bId => bId !== id))
-    } else {
-      setBookmarkedIds([...bookmarkedIds, id])
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      try {
+        const res = await bookmarkApi.getBookmarks()
+        const items = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+        const ids = items.map((b) => String(b.documentId || b.document?._id || b.document?.id || b._id || b.id))
+        setBookmarkedIds(ids)
+      } catch (err) {
+        console.error('Error fetching bookmarks:', err)
+      }
+    }
+    fetchBookmarks()
+  }, [])
+
+  const toggleBookmark = async (id) => {
+    const idStr = String(id)
+    const isBookmarked = bookmarkedIds.includes(idStr)
+    try {
+      if (isBookmarked) {
+        await bookmarkApi.removeBookmark(idStr)
+        setBookmarkedIds((prev) => prev.filter((bId) => bId !== idStr))
+        if (showToast) showToast('Removed from bookmarks', 'info')
+      } else {
+        await bookmarkApi.addBookmark(idStr)
+        setBookmarkedIds((prev) => [...prev, idStr])
+        if (showToast) showToast('Saved to bookmarks', 'success')
+      }
+    } catch (err) {
+      console.error('Error toggling bookmark:', err)
+      if (showToast) showToast(err.message || 'Failed to update bookmark', 'error')
     }
   }
 
@@ -194,7 +221,8 @@ export default function BrowsePanel() {
     }
   ]
 
-  const allDocuments = dbDocuments.map(doc => {
+  const allDocuments = dbDocuments.length > 0
+    ? dbDocuments.map(doc => {
         let ext = (doc.fileFormat || '').toUpperCase();
         if (!ext && doc.fileUrl) {
           const parts = doc.fileUrl.split('?')[0].split('/');
@@ -233,7 +261,8 @@ export default function BrowsePanel() {
           fileUrl: doc.fileUrl,
           fileSize: doc.fileSize
         };
-      });
+      })
+    : MOCK_DOCUMENTS;
 
   const documents = selectedFileType === 'All'
     ? allDocuments
@@ -544,10 +573,11 @@ export default function BrowsePanel() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {documents.map((doc) => {
-              const isBookmarked = bookmarkedIds.includes(doc.id)
+              const docId = String(doc.id || doc._id)
+              const isBookmarked = bookmarkedIds.includes(docId)
               return (
                 <div
-                  key={doc.id}
+                  key={doc.id || doc._id}
                   className="group bg-white rounded-2xl border border-outline-variant shadow-sm hover:shadow-md hover:border-primary transition-all duration-300 overflow-hidden flex flex-col hover:-translate-y-0.5"
                 >
                   {/* Thumbnail Card Preview */}
@@ -566,19 +596,12 @@ export default function BrowsePanel() {
                       </span>
                     </div>
                     {/* Bookmark Toggle */}
-                    <button
-                      onClick={() => toggleBookmark(doc.id)}
-                      className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full cursor-pointer shadow-sm hover:scale-105 transition-all ${
-                        isBookmarked ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
-                      }`}
-                    >
-                      <span
-                        className="material-symbols-outlined text-[20px]"
-                        style={isBookmarked ? { fontVariationSettings: "'FILL' 1" } : {}}
-                      >
-                        bookmark
-                      </span>
-                    </button>
+                    <BookmarkButton
+                      documentId={doc.id || doc._id}
+                      isBookmarked={isBookmarked}
+                      onToggle={(id) => toggleBookmark(id)}
+                      variant="card"
+                    />
                   </div>
 
                   {/* Body Content */}
@@ -632,10 +655,11 @@ export default function BrowsePanel() {
           /* List view layout */
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden shadow-sm divide-y divide-outline-variant/30">
             {documents.map((doc) => {
-              const isBookmarked = bookmarkedIds.includes(doc.id)
+              const docId = String(doc.id || doc._id)
+              const isBookmarked = bookmarkedIds.includes(docId)
               return (
                 <div
-                  key={doc.id}
+                  key={doc.id || doc._id}
                   className="group p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-surface-bright transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1">
@@ -658,19 +682,12 @@ export default function BrowsePanel() {
                     <span className="px-2.5 py-0.5 bg-secondary-container/10 text-secondary font-label-sm text-[11px] rounded-md font-bold">
                       {doc.subject}
                     </span>
-                    <button
-                      onClick={() => toggleBookmark(doc.id)}
-                      className={`p-1.5 rounded-full hover:bg-surface-container cursor-pointer transition-colors ${
-                        isBookmarked ? 'text-primary' : 'text-on-surface-variant'
-                      }`}
-                    >
-                      <span
-                        className="material-symbols-outlined text-[20px]"
-                        style={isBookmarked ? { fontVariationSettings: "'FILL' 1" } : {}}
-                      >
-                        bookmark
-                      </span>
-                    </button>
+                    <BookmarkButton
+                      documentId={doc.id || doc._id}
+                      isBookmarked={isBookmarked}
+                      onToggle={(id) => toggleBookmark(id)}
+                      variant="icon"
+                    />
                     <button
                       onClick={() => handleDownload(doc)}
                       className="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-all cursor-pointer"

@@ -12,6 +12,8 @@ import { PaymentModule } from './payment/payment.module';
 import { DocumentChatModule } from './document-chat/document-chat.module';
 import { NotificationModule } from './notification/notification.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BookmarkController } from './bookmark/bookmark.controller';
+import { BookmarkModule } from './bookmark/bookmark.module';
 
 @Module({
   imports: [
@@ -29,8 +31,9 @@ import { ScheduleModule } from '@nestjs/schedule';
     DocumentChatModule,
     NotificationModule,
     ScheduleModule.forRoot(),
+    BookmarkModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, BookmarkController],
   providers: [AppService],
 })
 export class AppModule {}
