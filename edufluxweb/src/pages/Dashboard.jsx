@@ -7,6 +7,7 @@ import OverviewPanel from '../components/dashboard/OverviewPanel'
 import BrowsePanel from '../components/dashboard/BrowsePanel'
 import MyUploadsPanel from '../components/dashboard/MyUploadsPanel'
 import AIChatPanel from '../components/dashboard/AIChatPanel'
+import BookmarksPanel from '../components/dashboard/BookmarksPanel'
 import SettingsPanel from '../components/dashboard/SettingsPanel'
 
 export default function Dashboard() {
@@ -18,6 +19,7 @@ export default function Dashboard() {
     if (window.location.pathname === '/my-upload') return 'My Uploads';
     if (window.location.pathname === '/browse-panel') return 'Browse';
     if (window.location.pathname === '/ai-chat') return 'AI Chat';
+    if (window.location.pathname === '/bookmarks') return 'Bookmarks';
     // Restore tab that was stored before navigating back to /dashboard
     const stored = sessionStorage.getItem('dashboard_pending_tab');
     if (stored) {
@@ -43,12 +45,14 @@ export default function Dashboard() {
       setActiveTab('Browse')
     } else if (location.pathname === '/ai-chat') {
       setActiveTab('AI Chat')
+    } else if (location.pathname === '/bookmarks') {
+      setActiveTab('Bookmarks')
     } else if (location.pathname === '/dashboard') {
       const stored = sessionStorage.getItem('dashboard_pending_tab')
       if (stored) {
         sessionStorage.removeItem('dashboard_pending_tab')
         setActiveTab(stored)
-      } else if (['My Uploads', 'Browse', 'AI Chat'].includes(activeTab)) {
+      } else if (['My Uploads', 'Browse', 'AI Chat', 'Bookmarks'].includes(activeTab)) {
         setActiveTab('Overview')
       }
     }
@@ -61,6 +65,8 @@ export default function Dashboard() {
       navigate('/browse-panel')
     } else if (tabName === 'AI Chat') {
       navigate('/ai-chat')
+    } else if (tabName === 'Bookmarks') {
+      navigate('/bookmarks')
     } else if (tabName === 'Subscription') {
       navigate('/subscription')
     } else {
@@ -116,17 +122,10 @@ export default function Dashboard() {
           )}
 
           {activeTab === 'Bookmarks' && (
-            <div className="p-8 max-w-container-max mx-auto w-full select-none animate-slide-up">
-              <h2 className="font-display text-headline-lg text-text-main font-bold mb-2">Bookmarked Resources</h2>
-              <p className="font-body-md text-body-md text-text-muted mb-8">Quick access to your pinned academic files and notes.</p>
-              <div className="bg-white border border-outline-variant rounded-2xl p-12 text-center text-text-muted shadow-sm">
-                <span className="material-symbols-outlined text-5xl mb-2 text-primary">bookmark</span>
-                <h4 className="font-headline-sm text-headline-sm text-text-main mb-2">Bookmarks Workspace</h4>
-                <p className="font-body-md text-body-md max-w-md mx-auto">
-                  Your pinned papers and lecture notes will appear here for immediate reference.
-                </p>
-              </div>
-            </div>
+            <BookmarksPanel
+              setActiveTab={handleTabChange}
+              showToast={showToast}
+            />
           )}
 
           {activeTab === 'Settings' && (

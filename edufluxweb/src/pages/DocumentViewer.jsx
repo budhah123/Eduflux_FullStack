@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { documentApi } from '../services/api/documentApi';
+import { bookmarkApi } from '../services/api/bookmarkApi';
+import BookmarkButton from '../components/BookmarkButton';
 import { useViewDocument } from '../hooks/useViewDocument';
 import DocumentChatPanel from '../components/DocumentChatPanel';
 import mammoth from 'mammoth/mammoth.browser';
@@ -103,6 +105,42 @@ export default function DocumentViewer({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const checkStatus = async () => {
+      if (!id) return;
+      try {
+        const res = await bookmarkApi.checkBookmark(id);
+        if (active) {
+          setSaved(Boolean(typeof res === 'object' ? res?.isBookmarked : res));
+        }
+      } catch (err) {
+        console.error('Error checking bookmark status:', err);
+      }
+    };
+    checkStatus();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const handleToggleBookmark = async (docId, nextState) => {
+    try {
+      if (nextState) {
+        await bookmarkApi.addBookmark(docId);
+        setSaved(true);
+        if (showToast) showToast('Saved to bookmarks', 'success');
+      } else {
+        await bookmarkApi.removeBookmark(docId);
+        setSaved(false);
+        if (showToast) showToast('Removed from bookmarks', 'info');
+      }
+    } catch (err) {
+      console.error('Error toggling bookmark:', err);
+      if (showToast) showToast(err.message || 'Failed to update bookmark', 'error');
+    }
+  };
 
   // react-pdf Load States
   const [pdfLoading, setPdfLoading] = useState(true);
@@ -1085,29 +1123,13 @@ export default function DocumentViewer({
                   </span>
                 </button>
 
-                {/* Save to Library Button */}
-                <button
-                  onClick={() => {
-                    setSaved(!saved);
-                    showToast(
-                      !saved ? 'Saved to library' : 'Removed from library',
-                      'success',
-                    );
-                  }}
-                  className={`w-full border py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    saved
-                      ? 'border-emerald-600 text-emerald-600 bg-emerald-50'
-                      : 'border-primary text-primary hover:bg-primary/5'
-                  }`}
-                >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontVariationSettings: `'FILL' ${saved ? 1 : 0}` }}
-                  >
-                    bookmark
-                  </span>
-                  <span>{saved ? 'Saved in Library' : 'Save to Library'}</span>
-                </button>
+                {/* Bookmark Document Button */}
+                <BookmarkButton
+                  documentId={id}
+                  isBookmarked={saved}
+                  onToggle={(docId, nextState) => handleToggleBookmark(docId, nextState)}
+                  variant="viewer"
+                />
               </div>
 
               {/* Report Document */}

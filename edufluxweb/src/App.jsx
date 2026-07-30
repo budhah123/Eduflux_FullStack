@@ -34,6 +34,7 @@ function App() {
           <Route path="/my-upload" element={<Dashboard />} />
           <Route path="/browse-panel" element={<Dashboard />} />
           <Route path="/ai-chat" element={<Dashboard />} />
+          <Route path="/bookmarks" element={<Dashboard />} />
           <Route path="/pricing" element={<PricingUnlock />} />
           <Route path="/unlock" element={<PricingUnlock />} />
           <Route path="/subscription" element={<Subscription />} />
