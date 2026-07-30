@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     if (window.location.pathname === '/my-upload') return 'My Uploads';
     if (window.location.pathname === '/browse-panel') return 'Browse';
+    if (window.location.pathname === '/ai-chat') return 'AI Chat';
     // Restore tab that was stored before navigating back to /dashboard
     const stored = sessionStorage.getItem('dashboard_pending_tab');
     if (stored) {
@@ -40,6 +41,16 @@ export default function Dashboard() {
       setActiveTab('My Uploads')
     } else if (location.pathname === '/browse-panel') {
       setActiveTab('Browse')
+    } else if (location.pathname === '/ai-chat') {
+      setActiveTab('AI Chat')
+    } else if (location.pathname === '/dashboard') {
+      const stored = sessionStorage.getItem('dashboard_pending_tab')
+      if (stored) {
+        sessionStorage.removeItem('dashboard_pending_tab')
+        setActiveTab(stored)
+      } else if (['My Uploads', 'Browse', 'AI Chat'].includes(activeTab)) {
+        setActiveTab('Overview')
+      }
     }
   }, [location.pathname])
 
@@ -48,6 +59,10 @@ export default function Dashboard() {
       navigate('/my-upload')
     } else if (tabName === 'Browse') {
       navigate('/browse-panel')
+    } else if (tabName === 'AI Chat') {
+      navigate('/ai-chat')
+    } else if (tabName === 'Subscription') {
+      navigate('/subscription')
     } else {
       if (location.pathname !== '/dashboard') {
         // Store intended tab so the remounted Dashboard can restore it

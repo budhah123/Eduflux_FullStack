@@ -10,7 +10,7 @@ export default function Hero() {
   }
 
   return (
-    <header className="relative pt-32 pb-24 px-margin-mobile md:px-margin-desktop overflow-hidden">
+    <header id="hero" className="relative pt-32 pb-24 px-margin-mobile md:px-margin-desktop overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#f0eeff]" />
       {/* Decorative blobs */}

@@ -42,7 +42,7 @@ export class DocumentsService {
       search,
       status,
       page = 1,
-      limit = 12,
+      limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = filter;
@@ -94,7 +94,8 @@ export class DocumentsService {
             });
             if (user) {
               uploader =
-                `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+                `${user.firstName || ''} ${user.lastName || ''}`.trim
+() ||
                 user.email ||
                 'System User';
               uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
@@ -119,7 +120,6 @@ export class DocumentsService {
       totalPages: Math.ceil(total / limit),
     };
   }
-
   // ─── GET ONE ──────────────────────────────────────────
   async findById(id: string): Promise<any> {
     if (!ObjectId.isValid(id)) {

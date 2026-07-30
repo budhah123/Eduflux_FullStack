@@ -58,11 +58,9 @@ export class NotificationController {
     type: 'number',
   })
   async getUnreadCount(@Req() req) {
-    console.log('[getUnreadCount] req.user._id:', req.user._id.toString()); // ← add this temporarily
     const count = await this.notificationService.getUnreadCount(
       req.user._id.toString(),
     );
-    console.log('[getUnreadCount] count result:', count); // ← add this too
     return { count };
   }
 
