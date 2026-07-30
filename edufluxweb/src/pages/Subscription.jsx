@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api/apiClient';
 import { useToast } from '../context/ToastContext';
+import Sidebar from '../components/dashboard/Sidebar';
 
 export default function Subscription() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function Subscription() {
   const [selectedProvider, setSelectedProvider] = useState('khalti'); // 'khalti' | 'esewa'
   const [initiating, setInitiating] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState({
     name: 'Academic User',
     role: 'Researcher',
@@ -75,7 +77,7 @@ export default function Subscription() {
   // Initiate payment workflow
   const handleInitiatePayment = async (overridePlan) => {
     const planType = overridePlan || billingCycle;
-    const amount = planType === 'yearly' ? 2870 : 299;
+    const amount = planType === 'yearly' ? 4799 : 499;
 
     try {
       setInitiating(true);
@@ -179,94 +181,22 @@ export default function Subscription() {
 
       <div className="bg-background min-h-screen text-on-surface font-sans">
         {/* Sidebar Navigation */}
-        <aside className="flex flex-col h-full py-6 px-4 fixed left-0 top-0 z-40 bg-white dark:bg-surface-container border-r border-outline-variant dark:border-outline w-[240px]">
-          <div className="mb-10 px-4">
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <span
-                className="material-symbols-outlined text-primary text-3xl"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                school
-              </span>
-              <h1 className="font-headline-sm text-headline-sm font-bold text-primary dark:text-inverse-primary">
-                Eduflux
-              </h1>
-            </Link>
-          </div>
-          <nav className="flex-1 space-y-2">
-            <Link
-              className="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low flex items-center px-4 py-2 gap-3 transition-all duration-200 rounded-lg"
-              to="/dashboard"
-            >
-              <span className="material-symbols-outlined">dashboard</span>
-              <span className="font-label-md text-label-md">Dashboard</span>
-            </Link>
-            <Link
-              className="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low flex items-center px-4 py-2 gap-3 transition-all duration-200 rounded-lg"
-              to="/browse-panel"
-            >
-              <span className="material-symbols-outlined">search</span>
-              <span className="font-label-md text-label-md">Browse</span>
-            </Link>
-            <Link
-              className="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low flex items-center px-4 py-2 gap-3 transition-all duration-200 rounded-lg"
-              to="/my-upload"
-            >
-              <span className="material-symbols-outlined">upload_file</span>
-              <span className="font-label-md text-label-md">My Uploads</span>
-            </Link>
-            <Link
-              className="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low flex items-center px-4 py-2 gap-3 transition-all duration-200 rounded-lg"
-              to="/dashboard"
-            >
-              <span className="material-symbols-outlined">auto_awesome</span>
-              <span className="font-label-md text-label-md">AI Chat</span>
-            </Link>
-            <Link
-              className="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low flex items-center px-4 py-2 gap-3 transition-all duration-200 rounded-lg"
-              to="/dashboard"
-            >
-              <span className="material-symbols-outlined">bookmark</span>
-              <span className="font-label-md text-label-md">Bookmarks</span>
-            </Link>
-            <Link
-              className="bg-primary-container text-on-primary-container dark:bg-primary dark:text-on-primary rounded-lg flex items-center px-4 py-2 gap-3 translate-x-1 duration-200"
-              to="/subscription"
-            >
-              <span className="material-symbols-outlined">credit_card</span>
-              <span className="font-label-md text-label-md">Subscription</span>
-            </Link>
-          </nav>
-
-          <div className="mt-auto border-t border-outline-variant pt-6 px-2">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary font-bold">
-                {userProfile.name.substring(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <p className="font-label-md text-label-md text-on-surface font-semibold">
-                  {userProfile.name}
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  {userProfile.role}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/my-upload')}
-              className="w-full bg-primary text-on-primary py-2 rounded-lg font-label-md text-label-md shadow-md hover:opacity-90 transition-opacity"
-            >
-              New Upload
-            </button>
-          </div>
-        </aside>
+        <Sidebar
+          activeTab="Subscription"
+          mobileOpen={mobileSidebarOpen}
+          setMobileOpen={setMobileSidebarOpen}
+          onNewUploadClick={() => navigate('/my-upload')}
+        />
 
         {/* Main Content Area */}
-        <main className="ml-[240px] min-h-screen">
+        <main className="md:ml-[240px] min-h-screen">
           {/* Top App Bar */}
           <header className="flex justify-between items-center w-full px-8 h-16 bg-surface-bright dark:bg-surface-dim border-b border-outline-variant z-30 sticky top-0">
             <div className="flex items-center gap-4">
-              <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">
+              <span
+                onClick={() => setMobileSidebarOpen(true)}
+                className="material-symbols-outlined text-on-surface-variant cursor-pointer md:hidden"
+              >
                 menu
               </span>
               <h2 className="font-headline-sm text-headline-sm text-primary font-bold">
@@ -318,8 +248,8 @@ export default function Subscription() {
                     <p className="font-headline-sm text-headline-sm text-primary font-bold">
                       {isActive
                         ? subData?.planType === 'yearly'
-                          ? 'NPR 2,870'
-                          : 'NPR 299'
+                          ? 'NPR 4,799'
+                          : 'NPR 499'
                         : 'NPR 0'}
                       <span className="text-body-sm text-text-muted font-normal">
                         {isActive
@@ -565,8 +495,8 @@ export default function Subscription() {
                         NPR{' '}
                         <span>
                           {billingCycle === 'yearly'
-                            ? '2,870 / yr'
-                            : '299 / mo'}
+                            ? '4,799 / yr'
+                            : '499 / mo'}
                         </span>
                       </td>
                       <td className="p-6 text-center text-text-main font-medium">
@@ -726,8 +656,8 @@ export default function Subscription() {
                           <td className="p-4 text-text-main">
                             NPR{' '}
                             {subData?.planType === 'yearly'
-                              ? '2,870.00'
-                              : '299.00'}
+                              ? '4,799.00'
+                              : '499.00'}
                           </td>
                           <td className="p-4">
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
@@ -751,7 +681,7 @@ export default function Subscription() {
                           INV-2023-0814
                         </td>
                         <td className="p-4 text-text-muted">Aug 14, 2023</td>
-                        <td className="p-4 text-text-main">NPR 299.00</td>
+                        <td className="p-4 text-text-main">NPR 499.00</td>
                         <td className="p-4">
                           <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
                             Paid
@@ -773,7 +703,7 @@ export default function Subscription() {
                           INV-2023-0614
                         </td>
                         <td className="p-4 text-text-muted">Jun 14, 2023</td>
-                        <td className="p-4 text-text-main">NPR 299.00</td>
+                        <td className="p-4 text-text-main">NPR 499.00</td>
                         <td className="p-4">
                           <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
                             Failed

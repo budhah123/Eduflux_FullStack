@@ -34,11 +34,11 @@ export class FilterDocumentDto {
   @IsNumber()
   page?: number = 1;
 
-  @ApiProperty({ required: false, default: 12 })
+  @ApiProperty({ required: false, default: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  limit?: number = 12;
+  limit?: number = 10;
 
   @ApiProperty({ required: false, default: 'createdAt' })
   @IsOptional()

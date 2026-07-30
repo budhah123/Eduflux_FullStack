@@ -85,10 +85,10 @@ export default function Sidebar({
   }, []);
 
   const sidebarItems = [
-    { name: 'Overview', label: 'Dashboard', icon: 'dashboard' },
-    { name: 'Browse', label: 'Browse', icon: 'search' },
-    { name: 'My Uploads', label: 'My Uploads', icon: 'upload_file' },
-    { name: 'AI Chat', label: 'AI Chat', icon: 'auto_awesome' },
+    { name: 'Overview', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+    { name: 'Browse', label: 'Browse', icon: 'search', route: '/browse-panel' },
+    { name: 'My Uploads', label: 'My Uploads', icon: 'upload_file', route: '/my-upload' },
+    { name: 'AI Chat', label: 'AI Chat', icon: 'auto_awesome', route: '/ai-chat' },
     { name: 'Bookmarks', label: 'Bookmarks', icon: 'bookmark' },
     {
       name: 'Subscription',
@@ -150,17 +150,20 @@ export default function Sidebar({
               <button
                 key={idx}
                 onClick={() => {
-                  if (item.route) {
+                  if (setActiveTab) {
+                    setActiveTab(item.name);
+                  } else if (item.route) {
                     navigate(item.route);
                   } else {
-                    setActiveTab(item.name);
+                    sessionStorage.setItem('dashboard_pending_tab', item.name);
+                    navigate('/dashboard');
                   }
-                  setMobileOpen(false); // auto close drawer on mobile click
+                  if (setMobileOpen) setMobileOpen(false); // auto close drawer on mobile click
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-label-md text-label-md transition-all duration-200 select-none cursor-pointer text-left ${
                   isActive
                     ? 'bg-primary-container text-on-primary-container font-semibold shadow-sm translate-x-1'
-                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface font-medium'
                 }`}
               >
                 <span

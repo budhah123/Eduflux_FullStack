@@ -8,6 +8,8 @@ export default function Navbar() {
   const [authLoading, setAuthLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('home');
+
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef(null);
@@ -72,6 +74,43 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Track active section based on route and scroll position
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      if (location.pathname === '/pricing') {
+        setActiveSection('pricing');
+      } else {
+        setActiveSection('');
+      }
+      return;
+    }
+
+    const handleScrollSpy = () => {
+      const scrollPosition = window.scrollY + 200;
+
+      const featuresEl = document.getElementById('features');
+      const pricingEl = document.getElementById('pricing');
+      const footerEl = document.getElementById('footer');
+
+      if (
+        footerEl &&
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 80
+      ) {
+        setActiveSection('about');
+      } else if (pricingEl && scrollPosition >= pricingEl.offsetTop) {
+        setActiveSection('pricing');
+      } else if (featuresEl && scrollPosition >= featuresEl.offsetTop) {
+        setActiveSection('features');
+      } else {
+        setActiveSection('home');
+      }
+    };
+
+    handleScrollSpy();
+    window.addEventListener('scroll', handleScrollSpy, { passive: true });
+    return () => window.removeEventListener('scroll', handleScrollSpy);
+  }, [location.pathname]);
 
   useEffect(() => {
     let isMounted = true;
@@ -151,23 +190,34 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const scrollToSection = (e, id) => {
-    e.preventDefault();
-    if (location.pathname !== '/') {
-      navigate('/');
-      setTimeout(() => {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-      }, 120);
+  const handleNavClick = (e, key, to, sectionId) => {
+    if (location.pathname === '/') {
+      if (key === 'home') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (sectionId) {
+        e.preventDefault();
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+      } else if (to === '/pricing') {
+        e.preventDefault();
+        document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+      }
     } else {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      if (sectionId) {
+        e.preventDefault();
+        navigate('/');
+        setTimeout(() => {
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+        }, 120);
+      }
     }
   };
 
   const navLinks = [
-    { label: 'Home', to: '/' },
-    { label: 'Features', sectionId: 'features' },
-    { label: 'Pricing', to: '/pricing' },
-    { label: 'About', sectionId: 'footer' },
+    { key: 'home', label: 'Home', to: '/' },
+    { key: 'features', label: 'Features', sectionId: 'features' },
+    { key: 'pricing', label: 'Pricing', to: '/pricing', sectionId: 'pricing' },
+    { key: 'about', label: 'About', sectionId: 'footer' },
   ];
 
   return (
@@ -203,30 +253,23 @@ export default function Navbar() {
 
         {/* Desktop nav links */}
         <div className="hidden md:flex items-center gap-8 h-full">
-          {navLinks.map(({ label, to, sectionId }, idx) =>
-            to ? (
+          {navLinks.map(({ key, label, to, sectionId }) => {
+            const isActive = activeSection === key;
+            return (
               <Link
-                key={idx}
-                to={to}
+                key={key}
+                to={to || `#${sectionId}`}
+                onClick={(e) => handleNavClick(e, key, to, sectionId)}
                 className={`font-label-md text-label-md h-16 flex items-center border-b-2 transition-colors duration-200 ${
-                  location.pathname === '/'
+                  isActive
                     ? 'text-primary border-primary font-semibold'
                     : 'text-on-surface-variant border-transparent hover:text-primary'
                 }`}
               >
                 {label}
               </Link>
-            ) : (
-              <a
-                key={idx}
-                href={`#${sectionId}`}
-                onClick={(e) => scrollToSection(e, sectionId)}
-                className="font-label-md text-label-md h-16 flex items-center border-b-2 border-transparent text-on-surface-variant hover:text-primary transition-colors duration-200"
-              >
-                {label}
-              </a>
-            ),
-          )}
+            );
+          })}
         </div>
 
         {/* Auth buttons */}
@@ -248,59 +291,59 @@ export default function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                 >
-                {userProfile.avatarUrl ? (
-                  <img
-                    src={userProfile.avatarUrl}
-                    alt={userProfile.fullName}
-                    className="w-10 h-10 rounded-full object-cover border border-outline-variant"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-brand-gradient text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                    {initials}
+                  {userProfile.avatarUrl ? (
+                    <img
+                      src={userProfile.avatarUrl}
+                      alt={userProfile.fullName}
+                      className="w-10 h-10 rounded-full object-cover border border-outline-variant"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-brand-gradient text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      {initials}
+                    </div>
+                  )}
+                  <span className="font-label-md text-label-md text-on-surface-variant max-w-[120px] truncate">
+                    {userProfile.firstName}
+                  </span>
+                  <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
+                    expand_more
+                  </span>
+                </button>
+
+                {menuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+10px)] w-52 rounded-xl border border-outline-variant bg-white shadow-xl overflow-hidden">
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/my-upload"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                    >
+                      My Uploads
+                    </Link>
+                    <Link
+                      to="/subscription"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                    >
+                      Subscription
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 text-sm font-medium text-error hover:bg-red-50"
+                    >
+                      Logout
+                    </button>
                   </div>
                 )}
-                <span className="font-label-md text-label-md text-on-surface-variant max-w-[120px] truncate">
-                  {userProfile.firstName}
-                </span>
-                <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
-                  expand_more
-                </span>
-              </button>
-
-              {menuOpen && (
-                <div className="absolute right-0 top-[calc(100%+10px)] w-52 rounded-xl border border-outline-variant bg-white shadow-xl overflow-hidden">
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
-                  >
-                    My Profile
-                  </Link>
-                  <Link
-                    to="/my-upload"
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
-                  >
-                    My Uploads
-                  </Link>
-                  <Link
-                    to="/subscription"
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
-                  >
-                    Subscription
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-3 text-sm font-medium text-error hover:bg-red-50"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
           ) : (
             <>
               <Link

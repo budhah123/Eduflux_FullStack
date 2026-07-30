@@ -18,13 +18,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(initialMessage);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (initialMessage) {
-      showToast(initialMessage, 'info');
+      showToast(initialMessage, 'success');
+      // Clear location state so refreshing or navigating back won't re-trigger
+      navigate(location.pathname, { replace: true, state: { email: initialEmail } });
     }
-  }, []);
+  }, [initialMessage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
