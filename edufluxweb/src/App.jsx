@@ -4,6 +4,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import GoogleAuthSuccess from './pages/GoogleAuthSuccess';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import DocumentViewer from './pages/DocumentViewer';
 import DocumentViewerComparison from './pages/DocumentViewerComparison';
@@ -30,6 +32,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/auth/google/success" element={<GoogleAuthSuccess />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/my-upload" element={<Dashboard />} />
           <Route path="/browse-panel" element={<Dashboard />} />
