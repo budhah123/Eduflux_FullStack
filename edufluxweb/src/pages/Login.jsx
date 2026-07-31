@@ -190,12 +190,12 @@ export default function Login() {
                   >
                     Password
                   </label>
-                  <a
+                  <Link
                     className="text-xs text-[#3525cd] hover:underline transition-all font-medium"
-                    href="#"
+                    to="/forgot-password"
                   >
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">

@@ -60,3 +60,12 @@ export const apiClient = {
     request(url, { ...options, method: 'PATCH', body }),
   delete: (url, options = {}) => request(url, { ...options, method: 'DELETE' }),
 };
+
+export const forgotPassword = async (email) => {
+  return apiClient.post('/auth/forgot-password', { email });
+};
+
+export const resetPassword = async (email, token, password) => {
+  return apiClient.post('/auth/reset-password', { email, token, password });
+};
+

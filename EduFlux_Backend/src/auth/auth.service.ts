@@ -167,8 +167,8 @@ export class AuthService {
 
     await this.authTokenRepository.save(authToken);
 
-    // For development, log the OTP. In production, this would be emailed.
-    console.log(`[DEBUG] OTP for ${email}: ${forgotPasswordCode}`);
+    // send OTP to user's email
+    await this.mailService.sendVerificationEmail(email, forgotPasswordCode);
 
     return 'Successful';
   }
