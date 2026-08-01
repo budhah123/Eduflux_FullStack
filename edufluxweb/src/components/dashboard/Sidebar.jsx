@@ -84,6 +84,23 @@ export default function Sidebar({
     };
   }, []);
 
+  useEffect(() => {
+    const handleProfileUpdate = (event) => {
+      const { firstName, avatarUrl } = event.detail;
+      if (firstName) {
+        setUserName(firstName.charAt(0).toUpperCase() + firstName.slice(1));
+      }
+      if (avatarUrl !== undefined) {
+        setUserAvatar(avatarUrl);
+      }
+    };
+
+    window.addEventListener('eduflux-profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('eduflux-profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
   const sidebarItems = [
     { name: 'Overview', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
     { name: 'Browse', label: 'Browse', icon: 'search', route: '/browse-panel' },
@@ -96,7 +113,7 @@ export default function Sidebar({
       icon: 'credit_card',
       route: '/subscription',
     },
-    { name: 'Settings', label: 'Settings', icon: 'settings' },
+    { name: 'Settings', label: 'Settings', icon: 'settings', route: '/settings' },
   ];
 
   const handleLogout = () => {

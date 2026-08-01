@@ -104,7 +104,7 @@ export const documentApi = {
     return apiClient.post('/payment/initiate', data);
   },
 
-  // GET /users/me/upload-progress (or /user/me/upload-progress)
+  // GET /users/me/upload-progress
   getUploadProgress: async () => {
     return apiClient.get('/users/me/upload-progress');
   },

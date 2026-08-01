@@ -92,6 +92,14 @@ export class UserEntity extends CommonAttribute {
   @Column('boolean', { name: 'isVerified', default: false })
   isVerified: boolean = false;
 
+  @ApiProperty({
+    description: 'Profile avatar image URL (Cloudinary)',
+    type: String,
+    required: false,
+  })
+  @Column('varchar', { name: 'avatarUrl', nullable: true })
+  avatarUrl?: string;
+
   @BeforeInsert()
   async hashedPassword() {
     // Only hash password if it exists (skip for OAuth users)

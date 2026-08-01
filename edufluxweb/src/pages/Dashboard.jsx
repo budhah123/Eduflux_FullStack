@@ -20,6 +20,7 @@ export default function Dashboard() {
     if (window.location.pathname === '/browse-panel') return 'Browse';
     if (window.location.pathname === '/ai-chat') return 'AI Chat';
     if (window.location.pathname === '/bookmarks') return 'Bookmarks';
+    if (window.location.pathname === '/settings') return 'Settings';
     // Restore tab that was stored before navigating back to /dashboard
     const stored = sessionStorage.getItem('dashboard_pending_tab');
     if (stored) {
@@ -47,12 +48,14 @@ export default function Dashboard() {
       setActiveTab('AI Chat')
     } else if (location.pathname === '/bookmarks') {
       setActiveTab('Bookmarks')
+    } else if (location.pathname === '/settings') {
+      setActiveTab('Settings')
     } else if (location.pathname === '/dashboard') {
       const stored = sessionStorage.getItem('dashboard_pending_tab')
       if (stored) {
         sessionStorage.removeItem('dashboard_pending_tab')
         setActiveTab(stored)
-      } else if (['My Uploads', 'Browse', 'AI Chat', 'Bookmarks'].includes(activeTab)) {
+      } else if (['My Uploads', 'Browse', 'AI Chat', 'Bookmarks', 'Settings'].includes(activeTab)) {
         setActiveTab('Overview')
       }
     }
@@ -67,6 +70,8 @@ export default function Dashboard() {
       navigate('/ai-chat')
     } else if (tabName === 'Bookmarks') {
       navigate('/bookmarks')
+    } else if (tabName === 'Settings') {
+      navigate('/settings')
     } else if (tabName === 'Subscription') {
       navigate('/subscription')
     } else {
