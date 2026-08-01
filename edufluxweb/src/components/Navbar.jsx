@@ -164,6 +164,28 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    const handleProfileUpdate = (event) => {
+      const { firstName, lastName, avatarUrl } = event.detail;
+      setUserProfile((prev) => {
+        if (!prev) return null;
+        const next = { ...prev };
+        if (firstName !== undefined) next.firstName = firstName;
+        if (lastName !== undefined) next.lastName = lastName;
+        if (firstName !== undefined || lastName !== undefined) {
+          next.fullName = [next.firstName, next.lastName].filter(Boolean).join(' ');
+        }
+        if (avatarUrl !== undefined) next.avatarUrl = avatarUrl;
+        return next;
+      });
+    };
+
+    window.addEventListener('eduflux-profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('eduflux-profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleOutsideClick = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);

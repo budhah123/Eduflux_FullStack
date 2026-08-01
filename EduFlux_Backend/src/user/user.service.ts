@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { FindOptionsOrder, FindOptionsWhere, MongoRepository } from 'typeorm';
 import { UserEntity } from './entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class UserService {
@@ -47,5 +48,22 @@ export class UserService {
   }
   async deleteUser(id: string) {
     return await this.userRepository.delete(id);
+  }
+
+  async changePassword(id: string, oldPassword: string, newPassword: string) {
+    const user = await this.userRepository.findOne({
+      where: { _id: new ObjectId(id) },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.password) {
+      throw new BadRequestException(
+        'This account has no password set (signed up via Google).',
+      );
+    }
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch)
+      throw new BadRequestException('Current password is incorrect');
+    await this.updateUser(id, { password: newPassword });
+    return { message: 'Password changed successfully' };
   }
 }

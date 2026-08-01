@@ -69,3 +69,22 @@ export const resetPassword = async (email, token, password) => {
   return apiClient.post('/auth/reset-password', { email, token, password });
 };
 
+export const getMyProfile = async () => {
+  return apiClient.get('/users/me');
+};
+
+export const updateMyProfile = async (data) => {
+  return apiClient.patch('/users/me', data);
+};
+
+export const changeMyPassword = async (data) => {
+  return apiClient.patch('/users/me/password', data);
+};
+
+export const uploadMyAvatar = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiClient.post('/users/me/avatar', formData);
+};
+
+
