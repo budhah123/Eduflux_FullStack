@@ -1,7 +1,8 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AtGuard, CurrentUser } from 'src/auth/decorator';
 import { UserService } from './user.service';
+import { ObjectId } from 'mongodb';
 
 @ApiTags('Users')
 @Controller('users')
@@ -32,15 +33,22 @@ export class UsersController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get my upload progress' })
   async uploadProgress(@CurrentUser() user: any) {
-    const approvedUploadCount = Number(user.approvedUploadCount || 0);
-    const unlockCredits = Number(user.unlockCredits || 0);
+    const userId = user._id?.toString?.() ?? user._id;
+    const freshUser = await this.userService.getUser({
+      _id: ObjectId.isValid(userId) ? new ObjectId(userId) : userId,
+    });
+    const documentsCount = await this.userService.countCountingUploads(userId);
+    const currentProgress = documentsCount % 3;
     const uploadsUntilNextCredit =
-      unlockCredits > 0 ? 0 : Math.max(0, 3 - (approvedUploadCount % 3 || 3));
+      documentsCount === 0 ? 3 : currentProgress === 0 ? 0 : 3 - currentProgress;
 
     return {
-      approvedUploadCount,
-      unlockCredits,
+      documentsUploaded: documentsCount,
+      approvedUploadCount: documentsCount,
+      progressInCurrentCycle: currentProgress,
       uploadsUntilNextCredit,
+      unlockCredits: freshUser?.unlockCredits ?? 0,
+      creditsEverEarned: freshUser?.creditsEverEarned ?? 0,
     };
   }
 }

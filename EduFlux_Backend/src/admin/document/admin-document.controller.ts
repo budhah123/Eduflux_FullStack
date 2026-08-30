@@ -80,7 +80,7 @@ export class AdminDocumentController {
   @Get()
   @ApiOperation({ summary: 'Browse all published documents' })
   findAll(@Query() filter: FilterDocumentDto) {
-    return this.documentService.findAll(filter);
+    return this.documentService.adminFindAll(filter);
   }
 
   @Get(':id')

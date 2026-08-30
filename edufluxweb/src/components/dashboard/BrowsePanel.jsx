@@ -37,19 +37,24 @@ export default function BrowsePanel() {
           search: searchQuery,
           subject: selectedSubject === 'All Subjects' ? '' : selectedSubject,
           category: selectedCategory === 'All' ? '' : selectedCategory,
+          status: 'approved',
           sortBy: sortByParam,
           sortOrder: 'desc',
           page,
           limit,
         };
-        const res = await documentApi.getAllDocuments(filters);
+        const res = await documentApi.getPublicDocuments(filters);
 
         if (res && typeof res === 'object') {
-          const docsArr = Array.isArray(res.data)
+          const rawList = Array.isArray(res.data)
             ? res.data
             : Array.isArray(res)
               ? res
               : [];
+          // Strict filter: only approved or published documents are permitted in Browse Panel
+          const docsArr = rawList.filter(
+            (d) => !d.status || d.status === 'approved' || d.status === 'published',
+          );
           setDbDocuments(docsArr);
           const totalVal =
             typeof res.total === 'number' ? res.total : docsArr.length;

@@ -62,8 +62,23 @@ export class DocumentsService {
       dto.thumbnailUrl = generatedThumbnail ?? undefined;
     }
 
-    const doc = this.documentRepository.create(dto);
-    return this.documentRepository.save(doc);
+    const doc = this.documentRepository.create({
+      status: DocumentStatus.PENDING,
+      ...dto,
+    });
+    const savedDoc = await this.documentRepository.save(doc);
+
+    if (savedDoc.userId) {
+      try {
+        await this.userService.reconcileUploadCredits(
+          savedDoc.userId.toString(),
+        );
+      } catch (err) {
+        console.error('Failed to reconcile upload credits on create:', err);
+      }
+    }
+
+    return savedDoc;
   }
 
   private attachThumbnailUrls<T extends Record<string, any>>(documents: T[]) {
@@ -117,7 +132,7 @@ export class DocumentsService {
   }
 
   // ─── GET ALL (filter + pagination) ────────────────────
-  async findAll(filter: FilterDocumentDto) {
+  async findAll(filter: FilterDocumentDto, requireApproved = true) {
     const {
       category,
       subject,
@@ -131,7 +146,13 @@ export class DocumentsService {
     } = filter;
 
     const query: any = {};
-    if (status) query.status = status;
+    if (status) {
+      query.status = status;
+    } else if (requireApproved) {
+      query.status = {
+        $in: [DocumentStatus.APPROVED, DocumentStatus.PUBLISHED],
+      };
+    }
     if (category) query.category = category;
     if (semester) query.semester = semester;
     if (subject) {
@@ -637,25 +658,31 @@ export class DocumentsService {
           link: `/documents/${doc._id}`,
         });
 
-        const user = await this.userService.getUser({
-          _id: new ObjectId(doc.userId),
-        });
+        // Atomically increment approvedUploadCount so concurrent approvals
+        // cannot both read the same stale count and both grant a credit.
+        // $inc is a single atomic MongoDB operation — no read-then-write window.
+        const userCollection = this.userService.getUserMongoRepository();
+        const updateResult = await userCollection.findOneAndUpdate(
+          { _id: new ObjectId(doc.userId) } as any,
+          { $inc: { approvedUploadCount: 1 } } as any,
+          { returnDocument: 'after' } as any,
+        );
 
-        if (user) {
-          const newCount = (user.approvedUploadCount || 0) + 1;
-          const updateData: any = { approvedUploadCount: newCount };
-
-          if (newCount % 3 === 0) {
-            updateData.unlockCredits = (user.unlockCredits || 0) + 1;
-            await this.notificationService.createNotification({
-              userId: doc.userId.toString(),
-              type: NotificationType.UNLOCK_CREDIT_EARNED,
-              title: 'Unlock Credit Earned!',
-              message: 'You earned 1 unlock credit for approved uploads.',
-            });
-          }
-
-          await this.userService.updateUser(doc.userId, updateData);
+        const updatedUser = updateResult?.value ?? updateResult;
+        if (updatedUser && (updatedUser.approvedUploadCount || 0) % 3 === 0) {
+          // Another atomic increment — only runs for exactly the call that
+          // pushed the count to a multiple of 3; concurrent calls land on
+          // different final counts, so at most one will hit the branch.
+          await userCollection.updateOne(
+            { _id: new ObjectId(doc.userId) } as any,
+            { $inc: { unlockCredits: 1 } } as any,
+          );
+          await this.notificationService.createNotification({
+            userId: doc.userId.toString(),
+            type: NotificationType.UNLOCK_CREDIT_EARNED,
+            title: 'Unlock Credit Earned!',
+            message: 'You earned 1 unlock credit for approved uploads.',
+          });
         }
       } else if (status === DocumentStatus.REJECTED) {
         await this.notificationService.createNotification({
@@ -672,7 +699,7 @@ export class DocumentsService {
 
   // ─── ADMIN: all docs ──────────────────────────────────
   async adminFindAll(filter: FilterDocumentDto) {
-    return this.findAll({ ...filter, status: undefined });
+    return this.findAll(filter, false);
   }
 
   // ─── shared cleanup logic ───
