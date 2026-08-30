@@ -18,16 +18,25 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const port = process.env.APP_PORT || 8080;
-  const corsOrigins = [
+  const corsOrigins = new Set([
     ...(process.env.FRONTEND_URL ?? '')
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
-  ].filter((origin, index, arr) => arr.indexOf(origin) === index);
+  ]);
+
+  const isAllowedOrigin = (origin?: string) => {
+    if (!origin) return true;
+    if (corsOrigins.has(origin)) return true;
+    return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+  };
+
   const swaggerUser = process.env.SWAGGER_USER ?? 'admin';
   const swaggerPassword =
     process.env.SWAGGER_PASSWORD ?? 'ChangeMe-Strong-Password';
@@ -59,7 +68,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || corsOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }

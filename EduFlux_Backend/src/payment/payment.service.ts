@@ -121,9 +121,15 @@ export class PaymentService {
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.warn('eSewa API verification warning:', errorMessage);
-      // If transactionUuid is passed from eSewa redirect, consider valid for development/sandbox
-      return !!dto.transactionUuid;
+      console.error('eSewa verification API call failed:', errorMessage);
+
+      // Local dev / sandbox only. Never enable in production.
+      if (process.env.ESEWA_SANDBOX_BYPASS === 'true') {
+        console.warn('SANDBOX BYPASS ACTIVE — not for production use');
+        return !!dto.transactionUuid;
+      }
+
+      return false;
     }
   }
 

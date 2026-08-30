@@ -76,47 +76,6 @@ const getSafeExtension = (fileFormat, fileUrl) => {
   return dotIndex !== -1 ? filename.slice(dotIndex + 1) : '';
 };
 
-const MOCK_DOCS = {
-  1: {
-    _id: '1',
-    title: 'Database Management Systems Notes',
-    subject: 'DBMS',
-    semester: 'Semester 4',
-    fileFormat: 'pdf',
-    category: 'Notes',
-    uploader: 'Dr. Sarah Jenkins',
-    uploaderAvatar:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA7TNH1CqY7mHSrLlFsFe477pTOhMLTvhp5yFEStihowWKusV968aR5Qy2FmnLHfryHF9gX55EfB-xFDaVHozWAo7GBLKrO1awU3BopGqoA1e9z44ZeQfosBscEIFVaUxyKK6ae4doVVSo6siQpFvKSFGlktOtGfOv_HVZKQ7d9FmaDWmD34rB7Cdg-Pb6i_ASaJaEqi3KpVv_2iEoROQjOtRsDb3dl7QA3RbhNA1KfsiJa2-PCZDpBdw',
-    downloadCount: 1200,
-    fileSize: 4800000,
-    tags: ['Notes', 'Semester 4', 'Computer Science'],
-    createdAt: '2026-06-03T14:42:07.589Z',
-    fileUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBtXKblxk3qOdK8R27XvBuYP590izZQrYTJvAE87x6w1nep6ReDGjcVdNTCdBsplCCIjKbrMbeNYPvC8vJf9YlUyz7m2bbj9KyEPoMLObHhZ0U36orF-_NjfTEnh1z_JfQBSqGiHEg6QYTJXna0owqoPt_loBzsQnR9nc2u0zSaJiMeOasbcWxE3PyTNR2CznK0DgnEBxNGxfibqWPI2KXd4asAZIKBtQY3MJ1VWIQEg2kTpuWn0OLquITUUcaYtePfRU89wsT75GHT',
-    isLocked: false,
-    unlockedVia: 'institutional',
-  },
-  2: {
-    _id: '2',
-    title:
-      'Neural Architecture Search in Large Language Models: A Comprehensive Survey',
-    subject: 'Artificial Intelligence',
-    semester: 'Graduate',
-    fileFormat: 'pdf',
-    category: 'Research Paper',
-    uploader: 'Dr. Elena Rodriguez',
-    uploaderAvatar:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC8ddiYm73oAe4XEMSraooLoad0QTG-aKe1ifnd-RFyUJFqELcKwAM3qwQyDcgck832u_Mw_47TuZY_Iyi6892EAzUimH2utTMaLQ4xFkiD1Gr-Wq_GmoztfefQXOov5slH6T3ns8wSFIlfRagQSPf9kV8hYq-uyQo1AJhvRAS11pgs-uG_CnrKZZsMnXgVaLhyi8PFXuhf-LgfyqAP6c2b21geulc0l0WAKqarsQZyCgOOLwPLL-fJzw',
-    downloadCount: 842,
-    fileSize: 3600000,
-    tags: ['Research Paper', 'AI', 'LLM'],
-    createdAt: '2026-05-12T02:50:52.123Z',
-    fileUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDq6PrARLljCtATbsHxvy93kXsIBB48nL9cXrzzh6TOXv1eSO5-Yb7ip7VlNjlufptUR0kq3c7WD5SascvuWrKjpQKXU0DZz611xkdfSg-sn03IR9iWYZy7LwAbHq_3S9FrmJad2JdGSOGKbNDVV1_s-e6jdGXTpA74d2c2vOqot1bzkZLyoEQQ3f7M1qJZSI9jUxyotr3T_RfnGoTN4CCqoKgBg0xhxlBkKdWYEYcqzNgV3nbDR9y8vOfMV3WkDFKaHlZfhHfzkMpL',
-    isLocked: true,
-  },
-};
-
 export default function DocumentViewer({
   documentId: customId,
   forcedState = null,
@@ -283,23 +242,16 @@ export default function DocumentViewer({
       try {
         setLoading(true);
         setError(null);
-
-        // Fallback to mock doc if given mock ID in development/demo mode
-        if (MOCK_DOCS[id]) {
-          const docData = MOCK_DOCS[id];
-          setDocument(docData);
-          setLoading(false);
-          return;
-        }
+        setDocument(null);
 
         const data = await documentApi.getDocument(id);
         setDocument(data);
       } catch (err) {
         console.error('Error fetching document:', err);
-        setError(err.message || 'Failed to load document metadata.');
-        if (MOCK_DOCS['1']) {
-          setDocument(MOCK_DOCS[id] || MOCK_DOCS['1']);
-        }
+        setError(
+          err.message || 'Failed to load this document. Please try again.',
+        );
+        setDocument(null);
       } finally {
         setLoading(false);
       }
@@ -476,18 +428,6 @@ export default function DocumentViewer({
 
     try {
       setDownloading(true);
-      if (MOCK_DOCS[id]) {
-        const link = window.document.createElement('a');
-        link.href = document.fileUrl;
-        link.setAttribute('download', `${document.title}.pdf`);
-        link.setAttribute('target', '_blank');
-        window.document.body.appendChild(link);
-        link.click();
-        link.remove();
-        showToast('Download started successfully', 'success');
-        return;
-      }
-
       const res = await documentApi.getDownloadUrl(id);
       if (res && res.url) {
         const link = window.document.createElement('a');
@@ -606,21 +546,45 @@ export default function DocumentViewer({
             cloud_off
           </span>
           <h3 className="font-headline-sm font-bold mb-2">
-            Failed to Load Document
+            Document Failed to Load
           </h3>
           <p className="text-body-sm text-text-muted mb-6">{error}</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/dashboard')}
             className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold"
           >
-            Go Back
+            Back to Browse
           </button>
         </div>
       </div>
     );
   }
 
-  const docData = document || MOCK_DOCS['1'];
+  if (!document) {
+    return (
+      <div className="min-h-[500px] bg-surface flex flex-col items-center justify-center p-6 text-text-main">
+        <div className="max-w-md w-full bg-white border border-outline-variant rounded-2xl p-8 text-center shadow-sm">
+          <span className="material-symbols-outlined text-5xl text-error mb-3">
+            search_off
+          </span>
+          <h3 className="font-headline-sm font-bold mb-2">
+            Document Not Found
+          </h3>
+          <p className="text-body-sm text-text-muted mb-6">
+            This document could not be found or is no longer available.
+          </p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold"
+          >
+            Back to Browse
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const docData = document;
 
   return (
     <div
@@ -921,7 +885,9 @@ export default function DocumentViewer({
                         <p className="font-semibold text-on-surface mb-2">
                           Preview Error
                         </p>
-                        <p className="text-sm text-text-muted">{previewError}</p>
+                        <p className="text-sm text-text-muted">
+                          {previewError}
+                        </p>
                       </div>
                     ) : previewHtml ? (
                       <div className="w-full max-w-[800px] overflow-auto bg-white rounded-xl border border-outline-variant shadow-xl">
@@ -956,7 +922,9 @@ export default function DocumentViewer({
                             <p className="font-semibold text-on-surface mb-2">
                               PDF Render Error
                             </p>
-                            <p className="text-sm text-text-muted">{pdfError}</p>
+                            <p className="text-sm text-text-muted">
+                              {pdfError}
+                            </p>
                           </div>
                         )}
                         <PdfDocument
