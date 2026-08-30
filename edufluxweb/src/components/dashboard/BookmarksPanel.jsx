@@ -140,7 +140,8 @@ export default function BookmarksPanel({ setActiveTab, showToast }) {
           author: doc.uploader || doc.author || 'Contributor',
           authorAvatar: doc.uploaderAvatar || doc.authorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
           downloads: doc.downloadCount || doc.downloads || 0,
-          image: doc.fileUrl || doc.image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+          thumbnailUrl: doc.thumbnailUrl,
+          image: doc.thumbnailUrl || doc.fileUrl || doc.image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
           rawDoc: doc,
         };
       }).filter(b => b.id);

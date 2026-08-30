@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import DocumentCard from '../components/DocumentCard'
+import { useState } from 'react';
+import DocumentCard from '../components/DocumentCard';
 
-const tabs = ['All', 'Lecture Notes', 'Assignments', 'Exam Papers', 'Notes']
+const tabs = ['All', 'Lecture Notes', 'Assignments', 'Exam Papers', 'Notes'];
 
 const documents = [
   {
@@ -48,21 +48,23 @@ const documents = [
     downloads: '2.3k',
     views: '6.8k',
   },
-]
+];
 
 export default function DocumentShowcase() {
-  const [activeTab, setActiveTab] = useState('All')
+  const [activeTab, setActiveTab] = useState('All');
 
   const filteredDocs =
     activeTab === 'All'
       ? documents
-      : documents.filter((doc) => doc.category === activeTab)
+      : documents.filter((doc) => doc.category === activeTab);
 
   return (
     <section
       id="showcase"
       className="py-24 px-margin-mobile md:px-margin-desktop scroll-mt-16"
-      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f5f4ff 100%)' }}
+      style={{
+        background: 'linear-gradient(180deg, #ffffff 0%, #f5f4ff 100%)',
+      }}
     >
       <div className="max-w-container-max mx-auto">
         {/* Header */}
@@ -77,8 +79,7 @@ export default function DocumentShowcase() {
             Student Repository
           </div>
           <h2 className="font-headline-lg text-headline-lg text-text-main mb-8">
-            Popular in Your{' '}
-            <span className="gradient-text">Department</span>
+            Popular in Your <span className="gradient-text">Department</span>
           </h2>
 
           {/* Tab filter pills */}
@@ -115,6 +116,7 @@ export default function DocumentShowcase() {
                 icon={doc.icon}
                 downloads={doc.downloads}
                 views={doc.views}
+                image={doc.image}
               />
             ))
           ) : (
@@ -122,11 +124,13 @@ export default function DocumentShowcase() {
               <span className="material-symbols-outlined text-5xl mb-3 block select-none text-slate-300">
                 folder_open
               </span>
-              <p className="font-body-md">No documents found in this category.</p>
+              <p className="font-body-md">
+                No documents found in this category.
+              </p>
             </div>
           )}
         </div>
       </div>
     </section>
-  )
+  );
 }

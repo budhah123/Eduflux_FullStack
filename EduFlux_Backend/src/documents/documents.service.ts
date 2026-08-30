@@ -29,8 +29,40 @@ export class DocumentsService {
 
   // ─── CREATE ───────────────────────────────────────────
   async create(dto: Partial<DocumentEntity>): Promise<DocumentEntity> {
+    const format = (
+      dto.fileFormat ||
+      dto.fileUrl?.split('.').pop() ||
+      ''
+    ).toLowerCase();
+
+    if (dto.fileKey && dto.fileUrl && ['pdf', 'docx', 'doc', 'image', 'png', 'jpg', 'jpeg', 'webp'].includes(format)) {
+      const generatedThumbnail =
+        dto.resourceType === 'image' && format === 'pdf'
+          ? this.fileUploadService.getThumbnailUrl(
+              dto.fileKey,
+              dto.resourceType,
+              dto.fileVersion,
+            )
+          : await this.fileUploadService.generateDocumentThumbnail(
+              dto.fileKey,
+              dto.fileUrl,
+              dto.resourceType,
+              format,
+              dto.fileVersion,
+            );
+
+      dto.thumbnailUrl = generatedThumbnail ?? undefined;
+    }
+
     const doc = this.documentRepository.create(dto);
     return this.documentRepository.save(doc);
+  }
+
+  private attachThumbnailUrls<T extends Record<string, any>>(documents: T[]) {
+    return documents.map((doc) => ({
+      ...doc,
+      thumbnailUrl: doc.thumbnailUrl ?? null,
+    }));
   }
 
   private sanitizePublicDocument(doc: any) {
@@ -93,32 +125,37 @@ export class DocumentsService {
       collection.count(query),
     ]);
 
-    const data = await Promise.all(
-      rawDocs.map(async (doc) => {
-        let uploader = 'System User';
-        let uploaderAvatar = '';
-        if (doc.userId) {
-          try {
-            const user = await this.userService.getUser({
-              _id: new ObjectId(doc.userId),
-            });
-            if (user) {
-              uploader =
-                `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
-                user.email ||
-                'System User';
-              uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
+    const data = this.attachThumbnailUrls(
+      await Promise.all(
+        rawDocs.map(async (doc) => {
+          let uploader = 'System User';
+          let uploaderAvatar = '';
+          if (doc.userId) {
+            try {
+              const user = await this.userService.getUser({
+                _id: new ObjectId(doc.userId),
+              });
+              if (user) {
+                uploader =
+                  `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+                  user.email ||
+                  'System User';
+                uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
+              }
+            } catch (err) {
+              console.error(
+                'Failed to populate uploader info for findAll:',
+                err,
+              );
             }
-          } catch (err) {
-            console.error('Failed to populate uploader info for findAll:', err);
           }
-        }
-        return {
-          ...doc,
-          uploader,
-          uploaderAvatar,
-        };
-      }),
+          return {
+            ...doc,
+            uploader,
+            uploaderAvatar,
+          };
+        }),
+      ),
     );
 
     return {
@@ -174,37 +211,39 @@ export class DocumentsService {
       collection.count(query),
     ]);
 
-    const data = await Promise.all(
-      rawDocs.map(async (doc) => {
-        let uploader = 'System User';
-        let uploaderAvatar = '';
-        if (doc.userId) {
-          try {
-            const user = await this.userService.getUser({
-              _id: new ObjectId(doc.userId),
-            });
-            if (user) {
-              uploader =
-                `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
-                user.email ||
-                'System User';
-              uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
+    const data = this.attachThumbnailUrls(
+      await Promise.all(
+        rawDocs.map(async (doc) => {
+          let uploader = 'System User';
+          let uploaderAvatar = '';
+          if (doc.userId) {
+            try {
+              const user = await this.userService.getUser({
+                _id: new ObjectId(doc.userId),
+              });
+              if (user) {
+                uploader =
+                  `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+                  user.email ||
+                  'System User';
+                uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
+              }
+            } catch (err) {
+              console.error(
+                'Failed to populate uploader info for findPublic:',
+                err,
+              );
             }
-          } catch (err) {
-            console.error(
-              'Failed to populate uploader info for findPublic:',
-              err,
-            );
           }
-        }
 
-        return this.sanitizePublicDocument({
-          ...doc,
-          uploader,
-          uploaderAvatar,
-        });
-      }),
-    );
+          return {
+            ...doc,
+            uploader,
+            uploaderAvatar,
+          };
+        }),
+      ),
+    ).map((doc) => this.sanitizePublicDocument(doc));
 
     return {
       data,
@@ -328,6 +367,23 @@ export class DocumentsService {
           userId,
         );
 
+      const thumbnailUrl =
+        fileFormat?.toLowerCase() === 'pdf'
+          ? await this.fileUploadService.generateDocumentThumbnail(
+              fileKey,
+              fileUrl,
+              resourceType,
+              fileFormat,
+              version,
+            )
+          : resourceType === 'image'
+            ? this.fileUploadService.getThumbnailUrl(
+                fileKey,
+                resourceType,
+                version,
+              )
+            : null;
+
       updateData = {
         ...updateData,
         fileKey,
@@ -336,6 +392,7 @@ export class DocumentsService {
         resourceType,
         fileVersion: version,
         fileSize: file.size,
+        thumbnailUrl: thumbnailUrl ?? undefined,
       };
     }
 
@@ -365,6 +422,23 @@ export class DocumentsService {
           String(doc.userId),
         );
 
+      const thumbnailUrl =
+        fileFormat?.toLowerCase() === 'pdf'
+          ? await this.fileUploadService.generateDocumentThumbnail(
+              fileKey,
+              fileUrl,
+              resourceType,
+              fileFormat,
+              version,
+            )
+          : resourceType === 'image'
+            ? this.fileUploadService.getThumbnailUrl(
+                fileKey,
+                resourceType,
+                version,
+              )
+            : null;
+
       updateData = {
         ...updateData,
         fileKey,
@@ -373,6 +447,7 @@ export class DocumentsService {
         resourceType,
         fileVersion: version,
         fileSize: file.size,
+        thumbnailUrl: thumbnailUrl ?? undefined,
       };
     }
 

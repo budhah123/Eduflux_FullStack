@@ -69,8 +69,18 @@ export class DocumentsController {
   // PUBLIC — browse list, only approved documents are visible to guests
   @Get('public')
   @ApiOperation({ summary: 'Browse approved documents for guests' })
-  findPublic(@Query() filter: FilterDocumentDto) {
+  async findPublic(@Query() filter: FilterDocumentDto) {
     return this.documentsService.findPublic(filter);
+  }
+
+  @Get('public-showcase')
+  @ApiOperation({ summary: 'Homepage document showcase for guests' })
+  async findPublicShowcase(@Query() filter: FilterDocumentDto) {
+    return this.documentsService.findPublic({
+      ...filter,
+      limit: filter?.limit || 8,
+      page: filter?.page || 1,
+    });
   }
 
   @Get('public/:id')
@@ -83,7 +93,7 @@ export class DocumentsController {
 
   @Get()
   @ApiOperation({ summary: 'Browse all published documents' })
-  findAll(@Query() filter: FilterDocumentDto) {
+  async findAll(@Query() filter: FilterDocumentDto) {
     return this.documentsService.findAll(filter);
   }
 
@@ -92,7 +102,7 @@ export class DocumentsController {
   @AtGuard()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get my uploaded documents' })
-  myUploads(
+  async myUploads(
     @Query() filter: FilterDocumentDto,
     @Req() req: { user: { _id: string } },
   ) {
