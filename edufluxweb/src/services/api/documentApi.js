@@ -35,9 +35,32 @@ export const documentApi = {
     return apiClient.get(`/documents/${id}/preview-url`);
   },
 
+  // GET /documents/public/:id
+  getPublicDocument: async (id) => {
+    return apiClient.get(`/documents/public/${id}`);
+  },
+
   // GET /documents/:id
   getDocument: async (id) => {
     return apiClient.get(`/documents/${id}`);
+  },
+
+  // GET /documents/public
+  getPublicDocuments: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach((key) => {
+      if (
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ''
+      ) {
+        params.append(key, filters[key]);
+      }
+    });
+    const queryString = params.toString();
+    return apiClient.get(
+      `/documents/public${queryString ? `?${queryString}` : ''}`,
+    );
   },
 
   // GET /documents

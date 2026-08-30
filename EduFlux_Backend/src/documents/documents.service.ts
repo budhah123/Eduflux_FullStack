@@ -33,6 +33,16 @@ export class DocumentsService {
     return this.documentRepository.save(doc);
   }
 
+  private sanitizePublicDocument(doc: any) {
+    const { fileUrl, fileKey, resourceType, fileVersion, ...safeDoc } =
+      doc || {};
+
+    return {
+      ...safeDoc,
+      isLocked: Boolean(doc?.isPremiumOnly),
+    };
+  }
+
   // ─── GET ALL (filter + pagination) ────────────────────
   async findAll(filter: FilterDocumentDto) {
     const {
@@ -94,8 +104,7 @@ export class DocumentsService {
             });
             if (user) {
               uploader =
-                `${user.firstName || ''} ${user.lastName || ''}`.trim
-() ||
+                `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
                 user.email ||
                 'System User';
               uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
@@ -120,6 +129,114 @@ export class DocumentsService {
       totalPages: Math.ceil(total / limit),
     };
   }
+  async findPublic(filter: FilterDocumentDto = {}) {
+    const {
+      category,
+      subject,
+      semester,
+      search,
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = filter;
+
+    const query: any = {
+      status: { $in: [DocumentStatus.APPROVED, DocumentStatus.PUBLISHED] },
+    };
+
+    if (category) query.category = category;
+    if (semester) query.semester = semester;
+    if (subject) query.subject = new RegExp(subject, 'i');
+
+    if (search) {
+      query.$or = [
+        { title: new RegExp(search, 'i') },
+        { subject: new RegExp(search, 'i') },
+        { tags: new RegExp(search, 'i') },
+      ];
+    }
+
+    const sortDirection = sortOrder?.toLowerCase() === 'asc' ? 1 : -1;
+    const skip = (page - 1) * limit;
+
+    const collection = this.documentRepository.manager
+      .getMongoRepository(DocumentEntity)
+      .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
+
+    const [rawDocs, total] = await Promise.all([
+      collection.find({
+        where: query,
+        order: { [sortBy]: sortDirection },
+        skip,
+        take: limit,
+      }),
+      collection.count(query),
+    ]);
+
+    const data = await Promise.all(
+      rawDocs.map(async (doc) => {
+        let uploader = 'System User';
+        let uploaderAvatar = '';
+        if (doc.userId) {
+          try {
+            const user = await this.userService.getUser({
+              _id: new ObjectId(doc.userId),
+            });
+            if (user) {
+              uploader =
+                `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+                user.email ||
+                'System User';
+              uploaderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(uploader)}&background=3525cd&color=fff`;
+            }
+          } catch (err) {
+            console.error(
+              'Failed to populate uploader info for findPublic:',
+              err,
+            );
+          }
+        }
+
+        return this.sanitizePublicDocument({
+          ...doc,
+          uploader,
+          uploaderAvatar,
+        });
+      }),
+    );
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findPublicById(id: string): Promise<any> {
+    if (!ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid document ID');
+    }
+
+    const doc = await this.documentRepository.findOne({
+      where: { _id: new ObjectId(id) },
+    });
+
+    if (!doc) throw new NotFoundException('Document not found');
+
+    if (
+      ![DocumentStatus.APPROVED, DocumentStatus.PUBLISHED].includes(
+        doc.status as DocumentStatus,
+      )
+    ) {
+      throw new NotFoundException('Document not found');
+    }
+
+    return this.sanitizePublicDocument(await this.findById(id));
+  }
+
   // ─── GET ONE ──────────────────────────────────────────
   async findById(id: string): Promise<any> {
     if (!ObjectId.isValid(id)) {

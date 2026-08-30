@@ -8,6 +8,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import DocumentViewer from './pages/DocumentViewer';
+import BrowsePage from './pages/BrowsePage';
 import DocumentViewerComparison from './pages/DocumentViewerComparison';
 import Subscription from './pages/Subscription';
 import PricingUnlock from './pages/PricingUnlock';
@@ -44,6 +45,7 @@ function App() {
             <Route path="/settings" element={<Dashboard />} />
             <Route path="/subscription" element={<Subscription />} />
           </Route>
+          <Route path="/browse" element={<BrowsePage />} />
           <Route path="/pricing" element={<PricingUnlock />} />
           <Route path="/unlock" element={<PricingUnlock />} />
           <Route

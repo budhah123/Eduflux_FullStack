@@ -227,6 +227,7 @@ export default function Navbar() {
 
   const navLinks = [
     { key: 'home', label: 'Home', to: '/' },
+    { key: 'browse', label: 'Browse', to: '/browse' },
     { key: 'features', label: 'Features', sectionId: 'features' },
     { key: 'pricing', label: 'Pricing', to: '/pricing', sectionId: 'pricing' },
     { key: 'about', label: 'About', sectionId: 'footer' },
@@ -358,6 +359,12 @@ export default function Navbar() {
             </div>
           ) : (
             <>
+              <Link
+                to="/browse"
+                className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors duration-200"
+              >
+                Browse Documents
+              </Link>
               <Link
                 to="/login"
                 id="navbar-login-btn"

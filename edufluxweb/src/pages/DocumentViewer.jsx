@@ -244,7 +244,10 @@ export default function DocumentViewer({
         setError(null);
         setDocument(null);
 
-        const data = await documentApi.getDocument(id);
+        const hasToken = Boolean(getAccessToken());
+        const data = hasToken
+          ? await documentApi.getDocument(id)
+          : await documentApi.getPublicDocument(id);
         setDocument(data);
       } catch (err) {
         console.error('Error fetching document:', err);

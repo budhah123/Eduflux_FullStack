@@ -1,30 +1,40 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom';
 
 export default function Hero() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const handleExploreClick = (e) => {
-    e.preventDefault()
-    const element = document.getElementById('showcase')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
-  }
+    e.preventDefault();
+    const element = document.getElementById('showcase');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    navigate('/browse');
+  };
 
   return (
-    <header id="hero" className="relative pt-32 pb-24 px-margin-mobile md:px-margin-desktop overflow-hidden">
+    <header
+      id="hero"
+      className="relative pt-32 pb-24 px-margin-mobile md:px-margin-desktop overflow-hidden"
+    >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#f0eeff]" />
       {/* Decorative blobs */}
       <div
         className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full opacity-20 pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #c3c0ff 0%, transparent 70%)' }}
+        style={{
+          background: 'radial-gradient(circle, #c3c0ff 0%, transparent 70%)',
+        }}
       />
       <div
         className="absolute -bottom-24 -left-24 w-[400px] h-[400px] rounded-full opacity-15 pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #d2bbff 0%, transparent 70%)' }}
+        style={{
+          background: 'radial-gradient(circle, #d2bbff 0%, transparent 70%)',
+        }}
       />
 
       <div className="relative max-w-container-max mx-auto flex flex-col items-center text-center">
-
         {/* Animated Badge */}
         <div
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-label-sm text-label-sm mb-8 animate-fade-in select-none"
@@ -50,10 +60,7 @@ export default function Hero() {
           }}
         >
           Access, Share &amp; Chat with{' '}
-          <span
-            className="gradient-text"
-            style={{ fontStyle: 'italic' }}
-          >
+          <span className="gradient-text" style={{ fontStyle: 'italic' }}>
             Academic Documents
           </span>{' '}
           — All in One Place
@@ -64,9 +71,9 @@ export default function Hero() {
           className="font-body-lg text-body-lg text-text-muted max-w-2xl mb-10 px-6 animate-slide-up"
           style={{ animationDelay: '160ms' }}
         >
-          The ultimate companion for Techspire students. Manage notes, previous year
-          questions, and research papers with an AI-powered assistant that knows your
-          curriculum.
+          The ultimate companion for Techspire students. Manage notes, previous
+          year questions, and research papers with an AI-powered assistant that
+          knows your curriculum.
         </p>
 
         {/* CTA Buttons */}
@@ -101,7 +108,7 @@ export default function Hero() {
           {[
             { value: '2,400+', label: 'Documents' },
             { value: '1,800+', label: 'Students' },
-            { value: '95%',    label: 'Satisfaction' },
+            { value: '95%', label: 'Satisfaction' },
           ].map((stat, i) => (
             <div key={i} className="flex flex-col items-center select-none">
               <span className="font-headline-md text-headline-md text-primary font-bold">
@@ -119,7 +126,8 @@ export default function Hero() {
           className="relative w-full max-w-5xl rounded-2xl overflow-hidden border border-outline-variant/40 animate-fade-in"
           style={{
             animationDelay: '400ms',
-            boxShadow: '0 24px 60px -12px rgba(53,37,205,0.20), 0 8px 24px -4px rgba(0,0,0,0.10)',
+            boxShadow:
+              '0 24px 60px -12px rgba(53,37,205,0.20), 0 8px 24px -4px rgba(0,0,0,0.10)',
           }}
         >
           {/* Gradient overlay top */}
@@ -134,7 +142,9 @@ export default function Hero() {
             <div className="w-3 h-3 rounded-full bg-yellow-400" />
             <div className="w-3 h-3 rounded-full bg-green-400" />
             <div className="flex-1 mx-4 h-6 rounded-full bg-white/10 flex items-center px-3">
-              <span className="text-white/50 text-xs font-mono">app.eduflux.np/dashboard</span>
+              <span className="text-white/50 text-xs font-mono">
+                app.eduflux.np/dashboard
+              </span>
             </div>
           </div>
 
@@ -151,11 +161,17 @@ export default function Hero() {
             style={{ animationDelay: '0ms' }}
           >
             <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-primary text-2xl">picture_as_pdf</span>
+              <span className="material-symbols-outlined text-primary text-2xl">
+                picture_as_pdf
+              </span>
             </div>
             <div>
-              <p className="text-xs font-bold text-text-main leading-none">CS101_Notes.pdf</p>
-              <p className="text-[10px] text-text-muted mt-1">Ready for study · 2.4 MB</p>
+              <p className="text-xs font-bold text-text-main leading-none">
+                CS101_Notes.pdf
+              </p>
+              <p className="text-[10px] text-text-muted mt-1">
+                Ready for study · 2.4 MB
+              </p>
             </div>
           </div>
 
@@ -173,12 +189,16 @@ export default function Hero() {
               </span>
             </div>
             <div>
-              <p className="text-xs font-bold text-text-main leading-none">AI Summarizing...</p>
-              <p className="text-[10px] text-text-muted mt-1">Extracting key concepts</p>
+              <p className="text-xs font-bold text-text-main leading-none">
+                AI Summarizing...
+              </p>
+              <p className="text-[10px] text-text-muted mt-1">
+                Extracting key concepts
+              </p>
             </div>
           </div>
         </div>
       </div>
     </header>
-  )
+  );
 }
