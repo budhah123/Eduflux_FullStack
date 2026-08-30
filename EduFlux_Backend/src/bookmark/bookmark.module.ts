@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BookmarkService } from './bookmark.service';
 import { BookmarkController } from './bookmark.controller';
 import { BookmarkEntity } from './entity'; // adjust to your real path
-import { DocumentEntity } from 'src/documents';
+import { DocumentEntity } from 'src/documents/entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([BookmarkEntity, DocumentEntity])],

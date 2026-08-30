@@ -141,4 +141,44 @@ export const documentApi = {
   askDocumentQuestion: async (id, question) => {
     return apiClient.post(`/documents/${id}/chat`, { question });
   },
+
+  // GET /ratings/document/:documentId
+  getDocumentRatings: async (documentId, page = 1, limit = 10) => {
+    return apiClient.get(
+      `/ratings/document/${documentId}?page=${page}&limit=${limit}`,
+    );
+  },
+
+  // POST /ratings
+  submitRating: async (payload) => {
+    return apiClient.post('/ratings', payload);
+  },
+
+  // DELETE /ratings/:id
+  deleteRating: async (id) => {
+    return apiClient.delete(`/ratings/${id}`);
+  },
+
+  // POST /reports
+  submitReport: async (payload) => {
+    return apiClient.post('/reports', payload);
+  },
+
+  // GET /admin/reports
+  adminGetReports: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    return apiClient.get(
+      `/admin/reports${params.toString() ? `?${params.toString()}` : ''}`,
+    );
+  },
+
+  // PATCH /admin/reports/:id/status
+  adminUpdateReportStatus: async (id, status) => {
+    return apiClient.patch(`/admin/reports/${id}/status`, { status });
+  },
 };

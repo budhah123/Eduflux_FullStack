@@ -12,11 +12,12 @@ import { PaymentModule } from './payment/payment.module';
 import { DocumentChatModule } from './document-chat/document-chat.module';
 import { NotificationModule } from './notification/notification.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BookmarkController } from './bookmark/bookmark.controller';
 import { BookmarkModule } from './bookmark/bookmark.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { RatingModule } from './rating/rating.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -37,8 +38,10 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     ScheduleModule.forRoot(),
     BookmarkModule,
     AuditLogModule,
+    RatingModule,
+    ReportModule,
   ],
-  controllers: [AppController, BookmarkController],
+  controllers: [AppController],
   providers: [
     AppService,
     {

@@ -16,6 +16,7 @@ import { UserService } from '../user/user.service';
 import { DocumentStatus } from './enum';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/enum';
+import { RatingService } from 'src/rating/rating.service';
 
 @Injectable()
 export class DocumentsService {
@@ -25,6 +26,7 @@ export class DocumentsService {
     private readonly fileUploadService: FileUploadService,
     private readonly userService: UserService,
     private readonly notificationService: NotificationService,
+    private readonly ratingService: RatingService,
   ) {}
 
   // ─── CREATE ───────────────────────────────────────────
@@ -35,7 +37,13 @@ export class DocumentsService {
       ''
     ).toLowerCase();
 
-    if (dto.fileKey && dto.fileUrl && ['pdf', 'docx', 'doc', 'image', 'png', 'jpg', 'jpeg', 'webp'].includes(format)) {
+    if (
+      dto.fileKey &&
+      dto.fileUrl &&
+      ['pdf', 'docx', 'doc', 'image', 'png', 'jpg', 'jpeg', 'webp'].includes(
+        format,
+      )
+    ) {
       const generatedThumbnail =
         dto.resourceType === 'image' && format === 'pdf'
           ? this.fileUploadService.getThumbnailUrl(
@@ -75,6 +83,39 @@ export class DocumentsService {
     };
   }
 
+  private escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  async ensureDocumentSearchIndex() {
+    const connection = this.documentRepository.manager.connection as any;
+    const collection = connection?.db?.collection('documents');
+
+    if (!collection) {
+      return;
+    }
+
+    await collection.createIndex(
+      {
+        title: 'text',
+        description: 'text',
+        subject: 'text',
+        category: 'text',
+        tags: 'text',
+      },
+      {
+        weights: {
+          title: 10,
+          tags: 5,
+          subject: 3,
+          category: 3,
+          description: 1,
+        },
+        name: 'document_search_index',
+      },
+    );
+  }
+
   // ─── GET ALL (filter + pagination) ────────────────────
   async findAll(filter: FilterDocumentDto) {
     const {
@@ -89,26 +130,33 @@ export class DocumentsService {
       sortOrder = 'desc',
     } = filter;
 
-    // Build native MongoDB query — TypeORM's findAndCount does NOT support
-    // $or / RegExp operators on MongoDB; use the native collection directly.
     const query: any = {};
-
-    // Only filter by status when explicitly provided (avoids filtering out
-    // documents that were saved without a status field, or with a different value)
     if (status) query.status = status;
     if (category) query.category = category;
     if (semester) query.semester = semester;
-    if (subject) query.subject = new RegExp(subject, 'i');
-
-    if (search) {
-      query.$or = [
-        { title: new RegExp(search, 'i') },
-        { subject: new RegExp(search, 'i') },
-        { tags: new RegExp(search, 'i') },
-      ];
+    if (subject) {
+      query.subject = new RegExp(this.escapeRegex(subject), 'i');
     }
 
-    const sortDirection = sortOrder?.toLowerCase() === 'asc' ? 1 : -1;
+    const trimmedSearch = search?.trim();
+    let sortOptions: any = {
+      [sortBy]: sortOrder?.toLowerCase() === 'asc' ? 1 : -1,
+    };
+
+    if (trimmedSearch) {
+      if (trimmedSearch.length < 2) {
+        query.$or = [
+          { title: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { subject: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { tags: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { description: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+        ];
+      } else {
+        query.$text = { $search: trimmedSearch };
+        sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
+      }
+    }
+
     const skip = (page - 1) * limit;
 
     const collection = this.documentRepository.manager
@@ -118,12 +166,29 @@ export class DocumentsService {
     const [rawDocs, total] = await Promise.all([
       collection.find({
         where: query,
-        order: { [sortBy]: sortDirection },
+        order: sortOptions,
         skip,
         take: limit,
       }),
       collection.count(query),
     ]);
+
+    const documentIds = rawDocs.map((doc) => String(doc._id));
+    const ratingStats = (await this.ratingService.getAverageRatingForDocuments(
+      documentIds,
+    )) as Array<{
+      documentId: string;
+      average: number;
+      count: number;
+    }>;
+    const ratingMap = new Map<string, { average: number; count: number }>();
+
+    ratingStats.forEach((item) => {
+      ratingMap.set(String(item.documentId), {
+        average: Number(item.average || 0),
+        count: Number(item.count || 0),
+      });
+    });
 
     const data = this.attachThumbnailUrls(
       await Promise.all(
@@ -149,10 +214,13 @@ export class DocumentsService {
               );
             }
           }
+          const stat = ratingMap.get(String(doc._id));
           return {
             ...doc,
             uploader,
             uploaderAvatar,
+            averageRating: stat?.average ?? 0,
+            ratingCount: stat?.count ?? 0,
           };
         }),
       ),
@@ -184,17 +252,27 @@ export class DocumentsService {
 
     if (category) query.category = category;
     if (semester) query.semester = semester;
-    if (subject) query.subject = new RegExp(subject, 'i');
+    if (subject) query.subject = new RegExp(this.escapeRegex(subject), 'i');
 
-    if (search) {
-      query.$or = [
-        { title: new RegExp(search, 'i') },
-        { subject: new RegExp(search, 'i') },
-        { tags: new RegExp(search, 'i') },
-      ];
+    const trimmedSearch = search?.trim();
+    let sortOptions: any = {
+      [sortBy]: sortOrder?.toLowerCase() === 'asc' ? 1 : -1,
+    };
+
+    if (trimmedSearch) {
+      if (trimmedSearch.length < 2) {
+        query.$or = [
+          { title: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { subject: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { tags: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+          { description: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
+        ];
+      } else {
+        query.$text = { $search: trimmedSearch };
+        sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
+      }
     }
 
-    const sortDirection = sortOrder?.toLowerCase() === 'asc' ? 1 : -1;
     const skip = (page - 1) * limit;
 
     const collection = this.documentRepository.manager
@@ -204,12 +282,29 @@ export class DocumentsService {
     const [rawDocs, total] = await Promise.all([
       collection.find({
         where: query,
-        order: { [sortBy]: sortDirection },
+        order: sortOptions,
         skip,
         take: limit,
       }),
       collection.count(query),
     ]);
+
+    const documentIds = rawDocs.map((doc) => String(doc._id));
+    const ratingStats = (await this.ratingService.getAverageRatingForDocuments(
+      documentIds,
+    )) as Array<{
+      documentId: string;
+      average: number;
+      count: number;
+    }>;
+    const ratingMap = new Map<string, { average: number; count: number }>();
+
+    ratingStats.forEach((item) => {
+      ratingMap.set(String(item.documentId), {
+        average: Number(item.average || 0),
+        count: Number(item.count || 0),
+      });
+    });
 
     const data = this.attachThumbnailUrls(
       await Promise.all(
@@ -236,10 +331,13 @@ export class DocumentsService {
             }
           }
 
+          const stat = ratingMap.get(String(doc._id));
           return {
             ...doc,
             uploader,
             uploaderAvatar,
+            averageRating: stat?.average ?? 0,
+            ratingCount: stat?.count ?? 0,
           };
         }),
       ),
@@ -306,10 +404,14 @@ export class DocumentsService {
       }
     }
 
+    const rating = await this.ratingService.getAverageRating(id);
+
     return {
       ...doc,
       uploader,
       uploaderAvatar,
+      averageRating: rating.average,
+      ratingCount: rating.count,
     };
   }
 

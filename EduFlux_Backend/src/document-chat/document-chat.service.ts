@@ -91,7 +91,7 @@ export class DocumentChatService {
     }
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant', // fast Groq-hosted model
+      model: process.env.GROQ_CHAT_MODEL || 'openai/gpt-oss-20b',
       messages: [
         {
           role: 'user',

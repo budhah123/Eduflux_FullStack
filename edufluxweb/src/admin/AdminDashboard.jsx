@@ -1,7 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { documentApi } from '../services/api/documentApi';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('monthly');
+  const [reports, setReports] = useState([]);
+  const [reportStatus, setReportStatus] = useState('pending');
+  const [loadingReports, setLoadingReports] = useState(false);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoadingReports(true);
+        const response = await documentApi.adminGetReports({
+          status: reportStatus,
+          page: 1,
+          limit: 20,
+        });
+        setReports(Array.isArray(response?.data) ? response.data : []);
+      } catch (error) {
+        console.error('Failed to load reports', error);
+        setReports([]);
+      } finally {
+        setLoadingReports(false);
+      }
+    };
+    fetchReports();
+  }, [reportStatus]);
+
+  const handleUpdateReportStatus = async (id, status) => {
+    try {
+      await documentApi.adminUpdateReportStatus(id, status);
+      setReports((prev) =>
+        prev.map((report) =>
+          report._id === id ? { ...report, status } : report,
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to update report status', error);
+    }
+  };
 
   // Registration chart data simulation
   const monthlyData = [
@@ -109,29 +146,41 @@ export default function AdminDashboard() {
               <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 {stat.title}
               </span>
-              <span className={`material-symbols-outlined ${stat.color}`}>{stat.icon}</span>
+              <span className={`material-symbols-outlined ${stat.color}`}>
+                {stat.icon}
+              </span>
             </div>
-            <div className="text-3xl font-bold text-[#1E293B]">{stat.value}</div>
-            <div className={`text-xs ${stat.badgeColor} mt-2 flex items-center gap-1 font-medium`}>
+            <div className="text-3xl font-bold text-[#1E293B]">
+              {stat.value}
+            </div>
+            <div
+              className={`text-xs ${stat.badgeColor} mt-2 flex items-center gap-1 font-medium`}
+            >
               {stat.badgeIcon && (
-                <span className="material-symbols-outlined text-[14px]">{stat.badgeIcon}</span>
+                <span className="material-symbols-outlined text-[14px]">
+                  {stat.badgeIcon}
+                </span>
               )}
               {stat.badge}
             </div>
           </div>
         ))}
 
-          {/* Revenue Bento (Custom Styled) */}
-          <div className="bg-[#3525cd] text-white p-6 rounded-xl border-none shadow-sm transition-all hover:-translate-y-[2px] sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-200 text-xs font-semibold uppercase tracking-wider opacity-90">
-                Revenue
-              </span>
-              <span className="material-symbols-outlined text-[#e2dfff]">payments</span>
-            </div>
-            <div className="text-3xl font-bold">NPR 95,700</div>
-            <div className="text-xs text-[#dad7ff] mt-2 opacity-80">Net growth +8.4%</div>
+        {/* Revenue Bento (Custom Styled) */}
+        <div className="bg-[#3525cd] text-white p-6 rounded-xl border-none shadow-sm transition-all hover:-translate-y-[2px] sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-200 text-xs font-semibold uppercase tracking-wider opacity-90">
+              Revenue
+            </span>
+            <span className="material-symbols-outlined text-[#e2dfff]">
+              payments
+            </span>
           </div>
+          <div className="text-3xl font-bold">NPR 95,700</div>
+          <div className="text-xs text-[#dad7ff] mt-2 opacity-80">
+            Net growth +8.4%
+          </div>
+        </div>
       </div>
 
       {/* Analytics Bento Grid */}
@@ -139,12 +188,16 @@ export default function AdminDashboard() {
         {/* User Registrations Chart */}
         <div className="col-span-12 lg:col-span-8 bg-white/90 backdrop-blur-md border border-[#c7c4d8]/40 p-6 rounded-xl shadow-sm">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-[#1E293B]">User Registrations</h3>
+            <h3 className="text-lg font-bold text-[#1E293B]">
+              User Registrations
+            </h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveTab('weekly')}
                 className={`text-xs font-medium px-3 py-1.5 rounded-md border border-[#c7c4d8]/40 transition-colors ${
-                  activeTab === 'weekly' ? 'bg-[#3525cd] text-white border-transparent' : 'bg-[#edeeef] text-[#1E293B] hover:bg-[#e7e8e9]'
+                  activeTab === 'weekly'
+                    ? 'bg-[#3525cd] text-white border-transparent'
+                    : 'bg-[#edeeef] text-[#1E293B] hover:bg-[#e7e8e9]'
                 }`}
               >
                 Weekly
@@ -152,7 +205,9 @@ export default function AdminDashboard() {
               <button
                 onClick={() => setActiveTab('monthly')}
                 className={`text-xs font-medium px-3 py-1.5 rounded-md border border-[#c7c4d8]/40 transition-colors ${
-                  activeTab === 'monthly' ? 'bg-[#3525cd] text-white border-transparent' : 'bg-[#edeeef] text-[#1E293B] hover:bg-[#e7e8e9]'
+                  activeTab === 'monthly'
+                    ? 'bg-[#3525cd] text-white border-transparent'
+                    : 'bg-[#edeeef] text-[#1E293B] hover:bg-[#e7e8e9]'
                 }`}
               >
                 Monthly
@@ -162,7 +217,10 @@ export default function AdminDashboard() {
 
           <div className="h-64 flex items-end justify-between gap-4 px-2">
             {chartData.map((data, i) => (
-              <div key={i} className={`flex-1 bg-[#3525cd]/10 rounded-t-lg relative group ${data.height}`}>
+              <div
+                key={i}
+                className={`flex-1 bg-[#3525cd]/10 rounded-t-lg relative group ${data.height}`}
+              >
                 {/* Tooltip */}
                 <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1E293B] text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
                   {data.value} Users
@@ -173,43 +231,60 @@ export default function AdminDashboard() {
           </div>
           <div className="flex justify-between mt-4 text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
             {chartData.map((data, i) => (
-              <span key={i} className="flex-1 text-center">{data.label}</span>
+              <span key={i} className="flex-1 text-center">
+                {data.label}
+              </span>
             ))}
           </div>
         </div>
 
         {/* User Types Donut */}
         <div className="col-span-12 lg:col-span-4 bg-white/90 backdrop-blur-md border border-[#c7c4d8]/40 p-6 rounded-xl shadow-sm flex flex-col items-center justify-center">
-          <h3 className="w-full text-left text-lg font-bold text-[#1E293B] mb-6">User Types</h3>
-          
+          <h3 className="w-full text-left text-lg font-bold text-[#1E293B] mb-6">
+            User Types
+          </h3>
+
           <div className="relative w-48 h-48 rounded-full border-[16px] border-[#edeeef] flex items-center justify-center">
             {/* Donut Segments Simulated by clip paths */}
             <div
               className="absolute inset-0 rounded-full border-[16px] border-[#3525cd]"
-              style={{ clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 50%)' }}
+              style={{
+                clipPath:
+                  'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 50%)',
+              }}
             ></div>
             <div
               className="absolute inset-0 rounded-full border-[16px] border-[#712ae2]"
               style={{ clipPath: 'polygon(50% 50%, 0% 50%, 0% 0%, 50% 0%)' }}
             ></div>
             <div className="text-center z-10">
-              <span className="text-3xl font-extrabold text-[#1E293B]">1.5k</span>
-              <span className="block text-xs text-slate-500 font-medium">Active Users</span>
+              <span className="text-3xl font-extrabold text-[#1E293B]">
+                1.5k
+              </span>
+              <span className="block text-xs text-slate-500 font-medium">
+                Active Users
+              </span>
             </div>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-2 w-full">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#3525cd]"></span>
-              <span className="text-xs text-[#1E293B] font-medium">Students (62%)</span>
+              <span className="text-xs text-[#1E293B] font-medium">
+                Students (62%)
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#712ae2]"></span>
-              <span className="text-xs text-[#1E293B] font-medium">Subscribers (20%)</span>
+              <span className="text-xs text-[#1E293B] font-medium">
+                Subscribers (20%)
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#e7e8e9]"></span>
-              <span className="text-xs text-[#1E293B] font-medium">Guests (18%)</span>
+              <span className="text-xs text-[#1E293B] font-medium">
+                Guests (18%)
+              </span>
             </div>
           </div>
         </div>
@@ -218,7 +293,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-12 gap-6">
         {/* Daily Uploads Bar */}
         <div className="col-span-12 lg:col-span-4 bg-white/90 backdrop-blur-md border border-[#c7c4d8]/40 p-6 rounded-xl shadow-sm flex flex-col justify-between">
-          <h3 className="text-lg font-bold text-[#1E293B] mb-6">Daily Uploads</h3>
+          <h3 className="text-lg font-bold text-[#1E293B] mb-6">
+            Daily Uploads
+          </h3>
           <div className="flex items-end h-40 gap-2 mb-4">
             <div className="flex-1 bg-[#3a65aa] rounded-t-sm h-[30%]"></div>
             <div className="flex-1 bg-[#3a65aa] rounded-t-sm h-[45%]"></div>
@@ -229,14 +306,19 @@ export default function AdminDashboard() {
             <div className="flex-1 bg-[#3a65aa] rounded-t-sm h-[75%]"></div>
           </div>
           <p className="text-sm text-slate-500 leading-relaxed mt-2">
-            System handled <span className="text-[#1E293B] font-bold">245 uploads</span> today with an average processing time of <span className="text-[#1E293B] font-bold">1.2s</span>.
+            System handled{' '}
+            <span className="text-[#1E293B] font-bold">245 uploads</span> today
+            with an average processing time of{' '}
+            <span className="text-[#1E293B] font-bold">1.2s</span>.
           </p>
         </div>
 
         {/* Recent Activity Feed */}
         <div className="col-span-12 lg:col-span-8 bg-white/90 backdrop-blur-md border border-[#c7c4d8]/40 p-6 rounded-xl shadow-sm">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-[#1E293B]">Recent Activity</h3>
+            <h3 className="text-lg font-bold text-[#1E293B]">
+              Recent Activity
+            </h3>
             <button className="text-[#3525cd] text-xs font-bold hover:underline">
               View All Logs
             </button>
@@ -247,17 +329,28 @@ export default function AdminDashboard() {
                 key={i}
                 className={`flex items-center gap-4 p-3 hover:bg-[#f3f4f5] rounded-lg transition-colors ${activity.borderClass}`}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${activity.iconClass}`}>
-                  <span className="material-symbols-outlined">{activity.icon}</span>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${activity.iconClass}`}
+                >
+                  <span className="material-symbols-outlined">
+                    {activity.icon}
+                  </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#1E293B] truncate">
-                    {activity.title} <span className="text-slate-500 font-normal">{activity.action}</span>{' '}
+                    {activity.title}{' '}
+                    <span className="text-slate-500 font-normal">
+                      {activity.action}
+                    </span>{' '}
                     <span className="text-[#3525cd]">{activity.subject}</span>
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">{activity.meta}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {activity.meta}
+                  </p>
                 </div>
-                <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase whitespace-nowrap shrink-0 ${activity.statusClass}`}>
+                <span
+                  className={`px-2 py-1 text-[10px] font-bold rounded uppercase whitespace-nowrap shrink-0 ${activity.statusClass}`}
+                >
                   {activity.status}
                 </span>
               </div>
