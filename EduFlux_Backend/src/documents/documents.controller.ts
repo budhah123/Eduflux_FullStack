@@ -66,7 +66,21 @@ export class DocumentsController {
     private accessService: AccessService,
   ) {}
 
-  // PUBLIC — browse list, no lock detail needed here, just metadata
+  // PUBLIC — browse list, only approved documents are visible to guests
+  @Get('public')
+  @ApiOperation({ summary: 'Browse approved documents for guests' })
+  findPublic(@Query() filter: FilterDocumentDto) {
+    return this.documentsService.findPublic(filter);
+  }
+
+  @Get('public/:id')
+  @ApiOperation({
+    summary: 'Get guest-safe document metadata without protected file info',
+  })
+  async findPublicById(@Param('id') id: string) {
+    return this.documentsService.findPublicById(id);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Browse all published documents' })
   findAll(@Query() filter: FilterDocumentDto) {
