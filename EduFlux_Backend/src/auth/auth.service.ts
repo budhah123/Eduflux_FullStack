@@ -7,7 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
-import { ResetPasswordInput, TokenOutput } from './dto';
+import { RegisterInput, ResetPasswordInput, TokenOutput } from './dto';
 import { JwtConfigService } from './config';
 import { UserEntity } from 'src/user/entity';
 import { AuthTokenType } from './enum';
@@ -16,6 +16,7 @@ import { AuthTokenEntity } from './entity';
 import { MongoRepository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
+import { computeIsInstitutional } from './utils/institutional-check.util';
 
 import { ObjectId } from 'mongodb';
 import { MailService } from '@app/mail';
@@ -93,17 +94,36 @@ export class AuthService {
     };
   }
 
-  async register() {}
+  async register(registerInput: RegisterInput) {
+    const isInstitutional = computeIsInstitutional(registerInput.email);
+
+    const user = await this.userService.createUser({
+      ...registerInput,
+      isInstitutional,
+    });
+
+    await this.generateAuthTokenAndSendVerificationCode(user, AuthType.EMAIL);
+
+    return user;
+  }
+
   async validateGoogleUser(googleUser: any) {
     const user = await this.userService.getUser({ email: googleUser.email });
     if (user) {
       return user;
     }
+    // Compute institutional status from email domain — same logic as register().
+    // Without this, the spread of googleUser (which has no isInstitutional field)
+    // would store null in MongoDB and block premium-content access for institutional
+    // users who signed up via Google.
+    const isInstitutional = computeIsInstitutional(googleUser.email);
+
     // Create new Google user with isActive set to true
     return await this.userService.createUser({
       ...googleUser,
       isActive: true,
       isVerified: true,
+      isInstitutional,
     });
   }
 

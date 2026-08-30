@@ -16,7 +16,10 @@ import { join } from 'path';
 import basicAuth from 'express-basic-auth';
 import helmet from 'helmet';
 
+import { validateEnv } from './config/validate-env';
+
 async function bootstrap() {
+  validateEnv();
   const port = process.env.APP_PORT || 8080;
   const corsOrigins = new Set([
     ...(process.env.FRONTEND_URL ?? '')

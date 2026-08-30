@@ -21,13 +21,23 @@ export class AccessService {
     private subRepo: Repository<SubscriptionEntity>,
   ) {}
 
-  async checkAccess(user: UserEntity): Promise<AccessResult> {
-    // Path 1: Techspire institutional student — always free
-    if (user.isInstitutional) {
+  async checkViewAccess(user: UserEntity): Promise<AccessResult> {
+    if (user.isInstitutional && user.isVerified) {
       return { access: true, reason: 'institutional' };
     }
 
-    // Path 2: Active paid subscription (Khalti/eSewa)
+    return this.checkPaidAccess(user);
+  }
+
+  async checkDownloadAccess(user: UserEntity): Promise<AccessResult> {
+    return this.checkPaidAccess(user);
+  }
+
+  async checkAccess(user: UserEntity): Promise<AccessResult> {
+    return this.checkViewAccess(user);
+  }
+
+  private async checkPaidAccess(user: UserEntity): Promise<AccessResult> {
     const userId = user._id?.toString();
     const userObjectId =
       userId && ObjectId.isValid(userId) ? new ObjectId(userId) : user._id;
@@ -50,14 +60,12 @@ export class AccessService {
       return { access: true, reason: 'subscription' };
     }
 
-    // Path 3: Upload-earned unlock credit (3 approved uploads = 1 credit)
     if (user.unlockCredits > 0) {
       user.unlockCredits -= 1;
       await this.userRepo.save(user);
       return { access: true, reason: 'upload_credit' };
     }
 
-    // None matched
     return { access: false, reason: 'locked' };
   }
 }

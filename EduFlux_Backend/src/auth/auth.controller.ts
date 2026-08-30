@@ -64,13 +64,8 @@ export class AuthController {
         `User with email: ${email} already exists!`,
       );
     }
-    const user = await this.userService.createUser(registerInput);
 
-    await this.authService.generateAuthTokenAndSendVerificationCode(
-      user,
-      AuthType.EMAIL,
-    );
-    return user;
+    return this.authService.register(registerInput);
   }
 
   @Throttle({ default: { limit: 8, ttl: 60 } })

@@ -5,6 +5,7 @@ import { DocumentEntity } from './entity';
 import { FileUploadService } from '@app/file-upload';
 import { UserService } from '../user/user.service';
 import { NotificationService } from '../notification/notification.service';
+import { RatingService } from '../rating/rating.service';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;
@@ -60,6 +61,13 @@ describe('DocumentsService', () => {
         {
           provide: NotificationService,
           useValue: {},
+        },
+        {
+          provide: RatingService,
+          useValue: {
+            getAverageRating: jest.fn().mockResolvedValue({ average: 0, count: 0 }),
+            getAverageRatingForDocuments: jest.fn().mockResolvedValue([]),
+          },
         },
       ],
     }).compile();

@@ -108,10 +108,16 @@ export default function DocumentPreviewModal({
       .toLowerCase()
       .trim();
 
+    const safetyTimer = window.setTimeout(() => {
+      setPreviewLoading(false);
+      setPreviewError('Taking too long to load preview. Please try again.');
+    }, 15000);
+
     previewDocument(
       doc._id,
       ext,
       (result) => {
+        window.clearTimeout(safetyTimer);
         if (result?.kind === 'html') {
           setPreviewHtml(result.html || '');
           setPreviewLoading(false);
@@ -137,6 +143,10 @@ export default function DocumentPreviewModal({
       },
       { autoRevoke: true },
     ); // Modal automatically revokes URL after 60s to save memory
+
+    return () => {
+      window.clearTimeout(safetyTimer);
+    };
   }, [isOpen, doc, fileType, previewDocument]);
 
   // Revoke object URL on unmount or when previewUrl changes

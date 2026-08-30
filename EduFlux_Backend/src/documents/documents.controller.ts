@@ -120,7 +120,7 @@ export class DocumentsController {
     if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
 
     if (doc.isPremiumOnly) {
-      const result = await this.accessService.checkAccess(req.user);
+      const result = await this.accessService.checkViewAccess(req.user);
       if (!result.access) {
         throw new ForbiddenException('Unlock this document to preview it');
       }
@@ -151,10 +151,10 @@ export class DocumentsController {
     if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
 
     if (doc.isPremiumOnly) {
-      const result = await this.accessService.checkAccess(req.user);
+      const result = await this.accessService.checkDownloadAccess(req.user);
       if (!result.access) {
         throw new ForbiddenException(
-          'Subscribe via Khalti/eSewa or upload 3 documents to unlock this document',
+          'Upload 3 documents to earn a download, or subscribe for unlimited downloads.',
         );
       }
     }
@@ -188,7 +188,7 @@ export class DocumentsController {
       return { ...doc, isLocked: false };
     }
 
-    const result = await this.accessService.checkAccess(req.user);
+    const result = await this.accessService.checkViewAccess(req.user);
 
     if (result.access) {
       return { ...doc, isLocked: false, unlockedVia: result.reason };

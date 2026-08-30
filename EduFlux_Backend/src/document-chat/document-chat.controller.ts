@@ -47,7 +47,7 @@ export class DocumentChatController {
 
     if (doc.isPremiumOnly) {
       this.logger.debug(`Checking access for document ${id}`);
-      const result = await this.accessService.checkAccess(req.user);
+      const result = await this.accessService.checkViewAccess(req.user);
       this.logger.debug(`Access check for ${id}: ${result.access}`);
       if (!result.access) {
         throw new ForbiddenException('Unlock this document to use AI chat');
