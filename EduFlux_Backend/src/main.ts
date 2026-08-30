@@ -14,11 +14,27 @@ import { SwaggerService } from '@app/swagger';
 import express from 'express';
 import { join } from 'path';
 import basicAuth from 'express-basic-auth';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const port = process.env.APP_PORT || 8080;
+  const corsOrigins = [
+    ...(process.env.FRONTEND_URL ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+  ].filter((origin, index, arr) => arr.indexOf(origin) === index);
+  const swaggerUser = process.env.SWAGGER_USER ?? 'admin';
+  const swaggerPassword =
+    process.env.SWAGGER_PASSWORD ?? 'ChangeMe-Strong-Password';
 
   const app = await NestFactory.create(AppModule);
+
+  app.use(helmet());
 
   // Serve static files
   app.use(express.static(join(__dirname, '..', 'public')));
@@ -31,7 +47,7 @@ async function bootstrap() {
     ['/admin/docs', '/docs'],
     basicAuth({
       challenge: true,
-      users: { budhah: 'Budhah@456' }, // TODO: Change to env variables
+      users: { [swaggerUser]: swaggerPassword },
     }),
   );
 
@@ -41,8 +57,19 @@ async function bootstrap() {
   // Enable compression
   app.use(compression());
 
-  //cors config
-  app.enableCors();
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

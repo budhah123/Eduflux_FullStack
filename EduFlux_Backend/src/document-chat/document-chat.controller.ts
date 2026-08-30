@@ -8,6 +8,7 @@ import {
   UseGuards,
   ForbiddenException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AtGuard } from '../auth/decorator';
@@ -21,6 +22,8 @@ import { ObjectId } from 'mongodb';
 @ApiBearerAuth('JWT-auth')
 @Controller('documents/:id/chat')
 export class DocumentChatController {
+  private readonly logger = new Logger(DocumentChatController.name);
+
   constructor(
     private chatService: DocumentChatService,
     private documentsService: DocumentsService,
@@ -35,31 +38,25 @@ export class DocumentChatController {
     @Body() dto: AskQuestionInput,
     @Req() req,
   ) {
-    console.log('[DocumentChatController] fetch document start', { id });
+    this.logger.debug(`Fetching document ${id} for chat request`);
     const doc = await this.documentsService.getDocument({
       _id: new ObjectId(id),
     });
-    console.log('[DocumentChatController] fetch document complete', {
-      id,
-      found: Boolean(doc),
-    });
+    this.logger.debug(`Document ${id} lookup result: ${Boolean(doc)}`);
     if (!doc) throw new NotFoundException('Document not found');
 
     if (doc.isPremiumOnly) {
-      console.log('[DocumentChatController] checking access', { id });
+      this.logger.debug(`Checking access for document ${id}`);
       const result = await this.accessService.checkAccess(req.user);
-      console.log('[DocumentChatController] access check complete', {
-        id,
-        access: result.access,
-      });
+      this.logger.debug(`Access check for ${id}: ${result.access}`);
       if (!result.access) {
         throw new ForbiddenException('Unlock this document to use AI chat');
       }
     }
 
-    console.log('[DocumentChatController] ask question start', { id });
+    this.logger.debug(`Asking question for document ${id}`);
     const answer = await this.chatService.askQuestion(id, dto.question);
-    console.log('[DocumentChatController] ask question complete', { id });
+    this.logger.debug(`Completed chat request for document ${id}`);
     return { answer };
   }
 }

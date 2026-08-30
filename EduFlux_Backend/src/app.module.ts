@@ -14,6 +14,9 @@ import { NotificationModule } from './notification/notification.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BookmarkController } from './bookmark/bookmark.controller';
 import { BookmarkModule } from './bookmark/bookmark.module';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -21,6 +24,7 @@ import { BookmarkModule } from './bookmark/bookmark.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRoot([{ ttl: 60, limit: 20 }]),
     DatabaseModule,
     UserModule,
     AuthModule,
@@ -32,8 +36,15 @@ import { BookmarkModule } from './bookmark/bookmark.module';
     NotificationModule,
     ScheduleModule.forRoot(),
     BookmarkModule,
+    AuditLogModule,
   ],
   controllers: [AppController, BookmarkController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

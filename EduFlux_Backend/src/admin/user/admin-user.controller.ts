@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Delete,
+  Req,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
@@ -19,17 +20,20 @@ import {
   ApiOkResponse,
 } from '@nestjs/swagger';
 import { ObjectId } from 'mongodb';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
 import { AdminAtGuard } from 'src/auth/decorator';
 import { PaginationInput } from 'src/common/pagination';
 import { CreateUserInput, UpdateUserInput } from 'src/user/dto';
 import { UserOutput } from 'src/user/dto/user.output';
 import { UserService } from 'src/user/user.service';
-
 @ApiTags('Admin User Management')
 @ApiSecurity('JWT-auth')
 @Controller('admin/user')
 export class AdminUserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Post()
   @AdminAtGuard()
@@ -39,7 +43,7 @@ export class AdminUserController {
     type: CreateUserInput,
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - No token provided' })
-  async createUser(@Body() createUserInput: CreateUserInput) {
+  async createUser(@Body() createUserInput: CreateUserInput, @Req() req) {
     const { email } = createUserInput;
     const user = await this.userService.getUser({
       email: email,
@@ -47,7 +51,17 @@ export class AdminUserController {
     if (user) {
       throw new BadRequestException(`User with email ${email} already exists`);
     }
-    return await this.userService.createUser(createUserInput);
+    const createdUser = await this.userService.createUser(createUserInput);
+    await this.auditLogService.logAdminAction({
+      adminUserId: req.user?._id?.toString?.() ?? req.user?.id ?? 'system',
+      action: 'created_user',
+      targetType: 'user',
+      targetId: String(createdUser._id),
+      targetName: createdUser.email,
+      details: `Admin created user ${createdUser.email}`,
+      timestamp: new Date(),
+    });
+    return createdUser;
   }
 
   @Get()
@@ -101,6 +115,7 @@ export class AdminUserController {
   async updateUser(
     @Param('id') id: string,
     @Body() updateUserInput: UpdateUserInput,
+    @Req() req,
   ) {
     const user = await this.getUserById(id);
     if (!user) {
@@ -108,6 +123,15 @@ export class AdminUserController {
     }
     const result = await this.userService.updateUser(id, updateUserInput);
     if (result.affected === 1) {
+      await this.auditLogService.logAdminAction({
+        adminUserId: req.user?._id?.toString?.() ?? req.user?.id ?? 'system',
+        action: 'updated_user',
+        targetType: 'user',
+        targetId: id,
+        targetName: user.email,
+        details: `Admin updated user ${user.email}`,
+        timestamp: new Date(),
+      });
       return {
         message: `User with ID ${id} updated successfully`,
       };
@@ -122,13 +146,22 @@ export class AdminUserController {
     description: 'User deleted successfully',
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - No token provided' })
-  async deleteUser(@Param('id') id: string) {
+  async deleteUser(@Param('id') id: string, @Req() req) {
     const user = await this.getUserById(id);
     if (!user) {
       throw new BadRequestException(`User with ID ${id} not found`);
     }
     const result = await this.userService.deleteUser(id);
     if (result.affected === 1) {
+      await this.auditLogService.logAdminAction({
+        adminUserId: req.user?._id?.toString?.() ?? req.user?.id ?? 'system',
+        action: 'deleted_user',
+        targetType: 'user',
+        targetId: id,
+        targetName: user.email,
+        details: `Admin deleted user ${user.email}`,
+        timestamp: new Date(),
+      });
       return {
         message: `User with ID ${id} deleted successfully`,
       };

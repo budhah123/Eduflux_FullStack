@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../../services/api/apiClient';
 import { useNavigate } from 'react-router-dom';
+import {
+  clearAuthTokens,
+  decodeTokenPayload,
+  getAccessToken,
+} from '../../utils/auth';
 
 export default function Sidebar({
   activeTab,
@@ -14,29 +19,13 @@ export default function Sidebar({
   const [userRole, setUserRole] = useState('Researcher');
   const [userAvatar, setUserAvatar] = useState(null);
 
-  const decodeTokenProfile = (token) => {
-    if (!token) return null;
-    try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        window
-          .atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(''),
-      );
-      return JSON.parse(jsonPayload);
-    } catch {
-      return null;
-    }
-  };
+  const decodeTokenProfile = (token) => decodeTokenPayload(token);
 
   useEffect(() => {
     let mounted = true;
 
     const loadProfile = async () => {
-      const token = sessionStorage.getItem('accessToken');
+      const token = getAccessToken();
       const fallback = decodeTokenProfile(token);
 
       if (!token || !fallback) return;
@@ -97,28 +86,55 @@ export default function Sidebar({
 
     window.addEventListener('eduflux-profile-updated', handleProfileUpdate);
     return () => {
-      window.removeEventListener('eduflux-profile-updated', handleProfileUpdate);
+      window.removeEventListener(
+        'eduflux-profile-updated',
+        handleProfileUpdate,
+      );
     };
   }, []);
 
   const sidebarItems = [
-    { name: 'Overview', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+    {
+      name: 'Overview',
+      label: 'Dashboard',
+      icon: 'dashboard',
+      route: '/dashboard',
+    },
     { name: 'Browse', label: 'Browse', icon: 'search', route: '/browse-panel' },
-    { name: 'My Uploads', label: 'My Uploads', icon: 'upload_file', route: '/my-upload' },
-    { name: 'AI Chat', label: 'AI Chat', icon: 'auto_awesome', route: '/ai-chat' },
-    { name: 'Bookmarks', label: 'Bookmarks', icon: 'bookmark', route: '/bookmarks' },
+    {
+      name: 'My Uploads',
+      label: 'My Uploads',
+      icon: 'upload_file',
+      route: '/my-upload',
+    },
+    {
+      name: 'AI Chat',
+      label: 'AI Chat',
+      icon: 'auto_awesome',
+      route: '/ai-chat',
+    },
+    {
+      name: 'Bookmarks',
+      label: 'Bookmarks',
+      icon: 'bookmark',
+      route: '/bookmarks',
+    },
     {
       name: 'Subscription',
       label: 'Subscription',
       icon: 'credit_card',
       route: '/subscription',
     },
-    { name: 'Settings', label: 'Settings', icon: 'settings', route: '/settings' },
+    {
+      name: 'Settings',
+      label: 'Settings',
+      icon: 'settings',
+      route: '/settings',
+    },
   ];
 
   const handleLogout = () => {
-    sessionStorage.removeItem('accessToken');
-    sessionStorage.removeItem('refreshToken');
+    clearAuthTokens();
     navigate('/login');
   };
 

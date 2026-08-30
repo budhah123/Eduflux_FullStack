@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { setAuthTokens } from '../utils/auth';
 
 const REDIRECT_DELAY_MS = 900;
 const ERROR_REDIRECT_DELAY_MS = 1800;
@@ -25,8 +26,7 @@ export default function GoogleAuthSuccess() {
       return () => window.clearTimeout(timer);
     }
 
-    sessionStorage.setItem('accessToken', accessToken);
-    sessionStorage.setItem('refreshToken', refreshToken);
+    setAuthTokens({ accessToken, refreshToken });
 
     setStatus('success');
     setMessage('Google sign-in successful. Redirecting to your dashboard...');
