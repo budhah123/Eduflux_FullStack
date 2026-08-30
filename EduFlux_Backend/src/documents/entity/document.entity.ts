@@ -145,4 +145,14 @@ export class DocumentEntity extends CommonAttribute {
   })
   @Column('string', { name: 'fileVersion', nullable: true })
   fileVersion?: string;
+
+  @ApiProperty({
+    description:
+      'Precomputed thumbnail URL for the document (stored once, not regenerated live).',
+    type: String,
+    example: 'https://res.cloudinary.com/.../image/upload/...jpg',
+    required: false,
+  })
+  @Column('string', { name: 'thumbnailUrl', nullable: true })
+  thumbnailUrl?: string;
 }

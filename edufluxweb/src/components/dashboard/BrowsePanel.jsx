@@ -257,6 +257,7 @@ export default function BrowsePanel() {
             author: doc.uploader || 'Instructor',
             authorAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.uploader || 'User')}&background=3525cd&color=fff`,
             downloads: String(doc.downloadCount || 0),
+            thumbnailUrl: doc.thumbnailUrl,
             image: image,
             fileUrl: doc.fileUrl,
             fileSize: doc.fileSize,
@@ -661,7 +662,11 @@ export default function BrowsePanel() {
                     <img
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       alt={doc.title}
-                      src={doc.image}
+                      src={doc.thumbnailUrl || doc.image}
+                      loading="lazy"
+                      onError={(event) => {
+                        event.target.src = doc.image;
+                      }}
                     />
                     <div className="absolute top-3 left-3 flex gap-2">
                       <span className="px-2.5 py-0.5 bg-primary text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
@@ -749,10 +754,27 @@ export default function BrowsePanel() {
                   className="group p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-surface-bright transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 select-none">
-                      <span className="material-symbols-outlined text-2xl">
-                        {doc.type === 'PDF' ? 'picture_as_pdf' : 'article'}
-                      </span>
+                    <div className="w-14 h-14 rounded-xl bg-surface-container-low overflow-hidden flex-shrink-0 relative select-none border border-outline-variant/40">
+                      <img
+                        src={doc.thumbnailUrl || doc.image}
+                        alt={doc.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                        onError={(event) => {
+                          event.target.style.display = 'none';
+                          if (event.target.nextSibling) {
+                            event.target.nextSibling.style.display = 'flex';
+                          }
+                        }}
+                      />
+                      <div
+                        className="w-full h-full bg-primary/10 items-center justify-center text-primary"
+                        style={{ display: doc.thumbnailUrl || doc.image ? 'none' : 'flex' }}
+                      >
+                        <span className="material-symbols-outlined text-2xl">
+                          {doc.type === 'PDF' ? 'picture_as_pdf' : 'article'}
+                        </span>
+                      </div>
                     </div>
                     <div
                       className="min-w-0 cursor-pointer"

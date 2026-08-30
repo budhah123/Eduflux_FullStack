@@ -181,9 +181,13 @@ export default function BrowsePage() {
               >
                 <div className="relative h-40 overflow-hidden bg-surface-container-low">
                   <img
-                    src={doc.image}
+                    src={doc.thumbnailUrl || doc.image}
                     alt={doc.title}
                     className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={(event) => {
+                      event.target.src = doc.image;
+                    }}
                   />
                   <div className="absolute left-3 top-3 flex gap-2">
                     <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold uppercase text-white">

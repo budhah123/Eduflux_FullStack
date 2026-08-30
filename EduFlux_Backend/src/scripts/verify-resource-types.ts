@@ -48,6 +48,8 @@ async function run() {
       console.log(`  _id: ${doc._id}`);
       console.log(`  fileKey: ${doc.fileKey}`);
       console.log(`  resourceType: ${doc.resourceType}`);
+      console.log(`  status: ${doc.status}`);
+      console.log(`  thumbnailUrl: ${doc.thumbnailUrl}`);
       console.log(`  fileVersion: ${doc.fileVersion}`);
       console.log(`  fileFormat: ${doc.fileFormat}`);
       console.log(`  fileUrl: ${doc.fileUrl}`);

@@ -8,6 +8,7 @@ import { NotificationService } from '../notification/notification.service';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;
+  let mockFileUploadService: { getThumbnailUrl: jest.Mock };
 
   const mongoCollection = {
     find: jest.fn(),
@@ -35,6 +36,10 @@ describe('DocumentsService', () => {
   };
 
   beforeEach(async () => {
+    mockFileUploadService = {
+      getThumbnailUrl: jest.fn(() => 'https://computed.example/thumb.jpg'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DocumentsService,
@@ -44,7 +49,7 @@ describe('DocumentsService', () => {
         },
         {
           provide: FileUploadService,
-          useValue: {},
+          useValue: mockFileUploadService,
         },
         {
           provide: UserService,
@@ -80,15 +85,16 @@ describe('DocumentsService', () => {
         fileKey: 'secret-file-key',
         resourceType: 'raw',
         fileVersion: '123',
-        userId: 'u-1',
+        userId: '507f1f77bcf86cd799439011',
         description: 'Public description',
+        thumbnailUrl: 'https://stored.example/thumb.jpg',
       },
       {
         _id: 'doc-2',
         title: 'Pending note',
         status: 'pending',
         fileUrl: 'https://secret.example/pending.pdf',
-        userId: 'u-2',
+        userId: '507f1f77bcf86cd799439012',
       },
     ]);
     mongoCollection.count.mockResolvedValue(1);
@@ -99,11 +105,13 @@ describe('DocumentsService', () => {
       _id: 'doc-1',
       title: 'Approved note',
       isLocked: true,
+      thumbnailUrl: 'https://stored.example/thumb.jpg',
     });
     expect(result.data[0]).not.toHaveProperty('fileUrl');
     expect(result.data[0]).not.toHaveProperty('fileKey');
     expect(result.data[0]).not.toHaveProperty('resourceType');
     expect(result.data[0]).not.toHaveProperty('fileVersion');
     expect(result.total).toBe(1);
+    expect(mockFileUploadService.getThumbnailUrl).not.toHaveBeenCalled();
   });
 });
