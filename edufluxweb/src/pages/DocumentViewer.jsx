@@ -118,6 +118,13 @@ export default function DocumentViewer({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [ratingDraft, setRatingDraft] = useState({ stars: 0, comment: '' });
+  const [ratings, setRatings] = useState([]);
+  const [ratingStats, setRatingStats] = useState({ average: 0, count: 0 });
+  const [reportReason, setReportReason] = useState('inappropriate');
+  const [reportDetails, setReportDetails] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -400,6 +407,24 @@ export default function DocumentViewer({
     }
   }, [id, Boolean(document)]);
 
+  const fetchRatings = async () => {
+    if (!id) return;
+    try {
+      const res = await documentApi.getDocumentRatings(id, 1, 10);
+      setRatings(Array.isArray(res?.data) ? res.data : []);
+      setRatingStats({
+        average: Number(res?.average || 0),
+        count: Number(res?.count || 0),
+      });
+    } catch (err) {
+      console.error('Error loading ratings:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRatings();
+  }, [id]);
+
   // Sync pdf load state
   useEffect(() => {
     if (previewUrl) {
@@ -423,6 +448,51 @@ export default function DocumentViewer({
   };
 
   // Download PDF Handler (Calls GET /documents/:id/download)
+  const handleSubmitRating = async () => {
+    if (!getAccessToken()) {
+      showToast('Please sign in to rate this document.', 'error');
+      return;
+    }
+
+    try {
+      setSubmittingRating(true);
+      const payload = {
+        documentId: id,
+        stars: ratingDraft.stars,
+        comment: ratingDraft.comment?.trim() || undefined,
+      };
+
+      await documentApi.submitRating(payload);
+      await fetchRatings();
+      setRatingDraft({ stars: 0, comment: '' });
+      showToast('Your rating was saved.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Unable to save rating', 'error');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!getAccessToken()) {
+      showToast('Please sign in to report this document.', 'error');
+      return;
+    }
+
+    try {
+      await documentApi.submitReport({
+        documentId: id,
+        reason: reportReason,
+        details: reportDetails || undefined,
+      });
+      setReportDetails('');
+      setShowReportModal(false);
+      showToast('Report submitted for review.', 'success');
+    } catch (err) {
+      showToast(err.message || 'Unable to submit report', 'error');
+    }
+  };
+
   const handleDownload = async () => {
     if (isLocked) {
       showToast('Document is locked. Please unlock to download.', 'error');
@@ -1197,21 +1267,122 @@ export default function DocumentViewer({
                 />
               </div>
 
+              <div className="mt-6 rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-bold text-text-main">Ratings</p>
+                  <span className="text-xs text-text-muted">
+                    {ratingStats.average.toFixed(1)} ★ ({ratingStats.count})
+                  </span>
+                </div>
+                {getAccessToken() ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() =>
+                            setRatingDraft((prev) => ({ ...prev, stars: star }))
+                          }
+                          className={`material-symbols-outlined text-2xl sm:text-3xl transition-transform hover:scale-110 ${ratingDraft.stars >= star ? 'text-academic-gold' : 'text-outline'}`}
+                          style={{
+                            fontVariationSettings:
+                              ratingDraft.stars >= star
+                                ? "'FILL' 1"
+                                : "'FILL' 0",
+                          }}
+                          aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                        >
+                          star
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={ratingDraft.comment}
+                      onChange={(e) =>
+                        setRatingDraft((prev) => ({
+                          ...prev,
+                          comment: e.target.value,
+                        }))
+                      }
+                      rows={3}
+                      placeholder="Share your feedback..."
+                      className="w-full rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={handleSubmitRating}
+                      disabled={submittingRating || ratingDraft.stars === 0}
+                      className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                    >
+                      {submittingRating ? 'Saving...' : 'Submit rating'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted">
+                    Sign in to rate this document.
+                  </p>
+                )}
+              </div>
+
               {/* Report Document */}
-              <button
-                onClick={() =>
-                  showToast(
-                    'Report submitted for administrative review',
-                    'success',
-                  )
-                }
-                className="w-full text-center text-label-sm text-text-muted mt-6 hover:text-academic-red transition-colors flex items-center justify-center gap-1 font-medium text-xs cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">
-                  report
-                </span>
-                <span>Report Document</span>
-              </button>
+              {getAccessToken() && (
+                <>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="w-full text-center text-label-sm text-text-muted mt-6 hover:text-academic-red transition-colors flex items-center justify-center gap-1 font-medium text-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      report
+                    </span>
+                    <span>Report Document</span>
+                  </button>
+                  {showReportModal && (
+                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold">Report document</h3>
+                          <button
+                            onClick={() => setShowReportModal(false)}
+                            className="material-symbols-outlined"
+                          >
+                            close
+                          </button>
+                        </div>
+                        <label className="block text-sm font-medium mb-2">
+                          Reason
+                        </label>
+                        <select
+                          value={reportReason}
+                          onChange={(e) => setReportReason(e.target.value)}
+                          className="w-full rounded-lg border border-outline-variant px-3 py-2 mb-4"
+                        >
+                          <option value="inappropriate">Inappropriate</option>
+                          <option value="copyright">Copyright</option>
+                          <option value="spam">Spam</option>
+                          <option value="wrong_category">Wrong category</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <label className="block text-sm font-medium mb-2">
+                          Details
+                        </label>
+                        <textarea
+                          value={reportDetails}
+                          onChange={(e) => setReportDetails(e.target.value)}
+                          rows={4}
+                          placeholder="Optional details"
+                          className="w-full rounded-lg border border-outline-variant px-3 py-2 mb-4"
+                        />
+                        <button
+                          onClick={handleSubmitReport}
+                          className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white"
+                        >
+                          Submit report
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Related Resources Panel */}
@@ -1278,6 +1449,83 @@ export default function DocumentViewer({
           </aside>
         </div>
       </main>
+
+      <div className="mt-8 max-w-4xl mx-auto rounded-2xl border border-outline-variant bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4 border-b border-outline-variant pb-3">
+          <h3 className="text-lg font-semibold text-on-surface">
+            Ratings & comments
+          </h3>
+          <span className="text-sm font-medium text-text-muted">
+            {ratingStats.average.toFixed(1)} ★ · {ratingStats.count} reviews
+          </span>
+        </div>
+        <div className="space-y-4">
+          {ratings.length === 0 ? (
+            <p className="text-sm text-text-muted">
+              No ratings yet for this document.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {ratings.map((rating) => {
+                const reviewerName =
+                  rating.user?.displayName ||
+                  rating.user?.firstName ||
+                  rating.user?.lastName ||
+                  'Anonymous reviewer';
+
+                return (
+                  <div
+                    key={rating._id || `${rating.userId}-${rating.createdAt}`}
+                    className="rounded-xl border border-outline-variant bg-surface-container-low p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={
+                            rating.user?.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(reviewerName)}&background=3525cd&color=fff`
+                          }
+                          alt={reviewerName}
+                          className="h-9 w-9 rounded-full object-cover"
+                        />
+                        <div>
+                          <p className="font-bold text-sm text-on-surface">
+                            {reviewerName}
+                          </p>
+                          <p className="text-[11px] text-text-muted">
+                            {new Date(rating.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-academic-gold">
+                        {[...Array(5)].map((_, index) => (
+                          <span
+                            key={index}
+                            className="material-symbols-outlined text-sm"
+                            style={{
+                              fontVariationSettings:
+                                index < Number(rating.stars)
+                                  ? "'FILL' 1"
+                                  : "'FILL' 0",
+                            }}
+                          >
+                            star
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {rating.comment && (
+                      <p className="mt-2 text-sm text-text-main">
+                        {rating.comment}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* AI Document Chat Panel */}
       <DocumentChatPanel

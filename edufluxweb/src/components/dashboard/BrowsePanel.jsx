@@ -247,6 +247,8 @@ export default function BrowsePanel() {
           ) {
             image = defaultThumbnails.biology;
           }
+          const avgRating = Number(doc.averageRating || 0);
+          const ratingCount = Number(doc.ratingCount || 0);
           return {
             id: doc._id,
             title: doc.title,
@@ -261,6 +263,8 @@ export default function BrowsePanel() {
             image: image,
             fileUrl: doc.fileUrl,
             fileSize: doc.fileSize,
+            averageRating: avgRating,
+            ratingCount,
           };
         })
       : [];
@@ -769,7 +773,10 @@ export default function BrowsePanel() {
                       />
                       <div
                         className="w-full h-full bg-primary/10 items-center justify-center text-primary"
-                        style={{ display: doc.thumbnailUrl || doc.image ? 'none' : 'flex' }}
+                        style={{
+                          display:
+                            doc.thumbnailUrl || doc.image ? 'none' : 'flex',
+                        }}
                       >
                         <span className="material-symbols-outlined text-2xl">
                           {doc.type === 'PDF' ? 'picture_as_pdf' : 'article'}

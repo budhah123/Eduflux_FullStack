@@ -77,9 +77,13 @@ export default function BrowsePage() {
       )
         image = defaultThumbnails.biology;
 
+      const avgRating = Number(doc.averageRating || 0);
+      const ratingCount = Number(doc.ratingCount || 0);
       return {
         ...doc,
         isLocked: Boolean(doc.isLocked || doc.isPremiumOnly),
+        averageRating: avgRating,
+        ratingCount,
         image,
       };
     });
@@ -216,6 +220,11 @@ export default function BrowsePage() {
                   <div className="flex flex-wrap gap-2 text-xs text-text-muted">
                     <span className="rounded-full bg-surface-container-low px-2 py-1">
                       {doc.subject || 'General'}
+                    </span>
+                    <span className="rounded-full bg-surface-container-low px-2 py-1">
+                      {doc.averageRating
+                        ? `${Number(doc.averageRating).toFixed(1)} ★`
+                        : 'No ratings yet'}
                     </span>
                     <span className="rounded-full bg-surface-container-low px-2 py-1">
                       {doc.semester || 'Semester N/A'}

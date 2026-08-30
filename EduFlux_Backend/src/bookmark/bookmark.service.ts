@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { BookmarkEntity } from './entity';
 import { MongoRepository } from 'typeorm';
-import { DocumentEntity } from 'src/documents';
+import { DocumentEntity } from 'src/documents/entity';
 import { ObjectId } from 'mongodb';
 
 @Injectable()
