@@ -505,9 +505,15 @@ export default function DocumentViewer({
       setDownloading(true);
       const res = await documentApi.getDownloadUrl(id);
       if (res && res.url) {
+        const fileExtension =
+          getSafeExtension(document?.fileFormat, document?.fileUrl) || 'pdf';
+        const safeTitle = (document?.title || 'document').replace(
+          /[\\/\\:*?"<>|]/g,
+          '_',
+        );
         const link = window.document.createElement('a');
         link.href = res.url;
-        link.setAttribute('download', `${document.title}.pdf`);
+        link.setAttribute('download', `${safeTitle}.${fileExtension}`);
         link.setAttribute('target', '_blank');
         window.document.body.appendChild(link);
         link.click();
@@ -909,6 +915,21 @@ export default function DocumentViewer({
 
                         {/* Payment Options (Khalti & eSewa) */}
                         <div className="w-full space-y-3">
+                          {/* Upload to Unlock Shortcut */}
+                          <button
+                            onClick={() =>
+                              navigate('/upload-to-unlock', {
+                                state: { returnTo: `/documents/${id}/view` },
+                              })
+                            }
+                            className="w-full py-3 bg-primary/10 text-primary hover:bg-primary/20 font-label-md text-label-md rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              cloud_upload
+                            </span>
+                            <span>Upload Document to Unlock (Free)</span>
+                          </button>
+
                           <div className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low rounded-xl mb-3">
                             <button
                               onClick={() => setSelectedProvider('khalti')}
@@ -1406,7 +1427,9 @@ export default function DocumentViewer({
                 <div className="bg-surface rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
                   <div className="flex items-center gap-2 mb-3">
                     <UploadCloud className="w-6 h-6 text-primary" />
-                    <h3 className="text-lg font-semibold">Unlock This Download</h3>
+                    <h3 className="text-lg font-semibold">
+                      Unlock This Download
+                    </h3>
                   </div>
                   <p className="text-on-surface-variant mb-5">
                     Upload 3 documents to earn a free download credit, or

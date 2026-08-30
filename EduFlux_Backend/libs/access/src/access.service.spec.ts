@@ -4,11 +4,21 @@ describe('AccessService', () => {
   let service: AccessService;
   let userRepo: { save: jest.Mock };
   let subRepo: { findOne: jest.Mock };
+  let unlockedDocRepo: { findOne: jest.Mock; save: jest.Mock; create: jest.Mock };
 
   beforeEach(() => {
     userRepo = { save: jest.fn().mockResolvedValue(true) };
     subRepo = { findOne: jest.fn().mockResolvedValue(null) };
-    service = new AccessService(userRepo as any, subRepo as any);
+    unlockedDocRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockResolvedValue(true),
+      create: jest.fn().mockImplementation((dto) => dto),
+    };
+    service = new AccessService(
+      userRepo as any,
+      subRepo as any,
+      unlockedDocRepo as any,
+    );
   });
 
   it('allows institutional users to view premium documents without granting download access', async () => {

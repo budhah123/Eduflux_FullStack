@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CommonAttribute } from 'src/common/attribute';
 import { UserEntity } from 'src/user/entity';
 import { Column, Entity, ObjectId, ObjectIdColumn } from 'typeorm';
+import { DocumentStatus } from '../enum';
 
 @Entity('documents')
 export class DocumentEntity extends CommonAttribute {
@@ -99,15 +100,15 @@ export class DocumentEntity extends CommonAttribute {
     example: 10,
   })
   @Column('number', { name: 'downloadCount', default: 0 })
-  downloadCount: number;
+  downloadCount: number = 0;
 
   @ApiProperty({
     description: 'Status of the files',
     type: String,
-    example: 'published',
+    example: DocumentStatus.PENDING,
   })
-  @Column('varchar', { name: 'status', default: 'published' })
-  status: string;
+  @Column('varchar', { name: 'status', default: DocumentStatus.PENDING })
+  status: DocumentStatus = DocumentStatus.PENDING;
 
   @ApiProperty({
     description:

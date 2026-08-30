@@ -18,6 +18,7 @@ export default function DocumentTable({
 }) {
   const navigate = useNavigate();
   const [bookmarkedIds, setBookmarkedIds] = useState([]);
+  const [docToDelete, setDocToDelete] = useState(null);
 
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -54,6 +55,13 @@ export default function DocumentTable({
   const handlePreviewClick = useCallback((doc) => {
     navigate(`/documents/${doc._id}/view`);
   }, [navigate]);
+
+  const handleConfirmDelete = async () => {
+    if (!docToDelete) return;
+    const targetId = docToDelete._id;
+    await onDelete(targetId);
+    setDocToDelete(null);
+  };
 
   const getDocMeta = (doc) => {
     const category = doc.category || '';
@@ -149,6 +157,7 @@ export default function DocumentTable({
           <tbody className="divide-y divide-outline-variant/30">
             {documents.map((doc) => {
               const meta = getDocMeta(doc);
+              const isDeletingThis = deletingIds.includes(doc._id);
               return (
                 <tr key={doc._id} className="group hover:bg-surface-bright transition-all duration-150">
                   <td className="px-6 py-4">
@@ -180,9 +189,9 @@ export default function DocumentTable({
                   <td className="px-6 py-4 text-body-sm select-none font-medium">{doc.downloadCount || 0}</td>
                   <td className="px-6 py-4 select-none">
                     <div className="flex items-center gap-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full ${doc.status === 'published' ? 'bg-tertiary' : 'bg-text-muted'}`}></div>
-                      <span className={`text-body-sm font-semibold capitalize ${doc.status === 'published' ? 'text-tertiary' : 'text-text-muted'}`}>
-                        {doc.status || 'published'}
+                      <div className={`w-1.5 h-1.5 rounded-full ${doc.status === 'published' || doc.status === 'approved' ? 'bg-tertiary' : doc.status === 'rejected' ? 'bg-error' : 'bg-amber-500'}`}></div>
+                      <span className={`text-body-sm font-semibold capitalize ${doc.status === 'published' || doc.status === 'approved' ? 'text-tertiary' : doc.status === 'rejected' ? 'text-error' : 'text-amber-600'}`}>
+                        {doc.status || 'pending'}
                       </span>
                     </div>
                   </td>
@@ -216,12 +225,12 @@ export default function DocumentTable({
                         <span className="material-symbols-outlined text-[18px]">download</span>
                       </button>
                       <button
-                        onClick={() => onDelete(doc._id)}
+                        onClick={() => setDocToDelete(doc)}
                         className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant hover:text-error transition-colors cursor-pointer flex items-center justify-center min-w-[34px] min-h-[34px]"
                         title="Delete permanently"
-                        disabled={deletingIds.includes(doc._id)}
+                        disabled={isDeletingThis}
                       >
-                        {deletingIds.includes(doc._id) ? (
+                        {isDeletingThis ? (
                           <svg className="animate-spin h-[18px] w-[18px] text-error" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -263,6 +272,74 @@ export default function DocumentTable({
             >
               <span className="material-symbols-outlined">chevron_right</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal Dialog */}
+      {docToDelete && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm transition-opacity p-4 animate-fade-in"
+          onClick={() => {
+            if (!deletingIds.includes(docToDelete._id)) {
+              setDocToDelete(null);
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-error/20 animate-scale-in select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4.5 bg-error/5 border-b border-error/10 flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-error/10 text-error flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-on-surface">Delete Document</h3>
+                <p className="text-xs text-text-muted">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-text-main leading-relaxed">
+                Are you sure you want to delete <strong className="text-on-surface font-semibold">"{docToDelete.title}"</strong>?
+              </p>
+              <p className="text-xs text-text-muted leading-relaxed">
+                The document file and its metadata will be permanently removed from your uploads.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-surface-container-lowest border-t border-outline-variant/40 flex justify-end items-center gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 border border-outline-variant rounded-xl text-sm font-semibold text-text-main hover:bg-surface-container transition-colors cursor-pointer disabled:opacity-50"
+                onClick={() => setDocToDelete(null)}
+                disabled={deletingIds.includes(docToDelete._id)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-error text-white hover:bg-error/90 font-semibold text-sm rounded-xl transition-all shadow-sm hover:shadow active:scale-95 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                disabled={deletingIds.includes(docToDelete._id)}
+              >
+                {deletingIds.includes(docToDelete._id) ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                    <span>Delete Document</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

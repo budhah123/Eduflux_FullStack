@@ -85,6 +85,13 @@ export class UserEntity extends CommonAttribute {
   unlockCredits: number = 0;
 
   @ApiProperty({
+    description: 'Total lifetime unlock credits earned',
+    example: 0,
+  })
+  @Column('int', { name: 'creditsEverEarned', default: 0 })
+  creditsEverEarned: number = 0;
+
+  @ApiProperty({
     description: 'Whether the user has verified their email',
     type: Boolean,
     example: false,

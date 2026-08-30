@@ -13,6 +13,7 @@ import DocumentViewerComparison from './pages/DocumentViewerComparison';
 import Subscription from './pages/Subscription';
 import PricingUnlock from './pages/PricingUnlock';
 import PaymentCallback from './pages/PaymentCallback';
+import UploadToUnlock from './pages/UploadToUnlock';
 import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -44,6 +45,7 @@ function App() {
             <Route path="/bookmarks" element={<Dashboard />} />
             <Route path="/settings" element={<Dashboard />} />
             <Route path="/subscription" element={<Subscription />} />
+            <Route path="/upload-to-unlock" element={<UploadToUnlock />} />
           </Route>
           <Route path="/browse" element={<BrowsePage />} />
           <Route path="/pricing" element={<PricingUnlock />} />

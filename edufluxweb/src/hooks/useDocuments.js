@@ -163,19 +163,11 @@ export function useDocuments(showToast) {
 
   // Delete a document
   const deleteDoc = async (id) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to permanently delete this document?',
-      )
-    ) {
-      return;
-    }
-
     setDeletingIds((prev) => [...prev, id]);
     try {
       const res = await documentApi.deleteDocument(id);
       if (showToast) {
-        showToast(res?.message || 'Document deleted successfully');
+        showToast(res?.message || 'Document deleted successfully', 'success');
       }
       // Remove from the list on success
       setDocuments((prev) => prev.filter((doc) => doc._id !== id));
