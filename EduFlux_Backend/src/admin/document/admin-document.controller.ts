@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { MailService } from '@app/mail';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -33,6 +34,10 @@ import {
 import { DocumentsService } from 'src/documents/documents.service';
 import { FilterDocumentDto } from 'src/documents/dto/filter-document.dto';
 import { ChangeStatusDto } from 'src/documents/dto/change-status.dto';
+import { UserService } from 'src/user/user.service';
+import { DocumentStatus } from 'src/documents/enum';
+import { ObjectId } from 'mongodb';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'application/pdf',
@@ -67,6 +72,9 @@ export class AdminDocumentController {
   constructor(
     private readonly documentService: DocumentsService,
     private uploadService: FileUploadService,
+    private readonly userService: UserService,
+    private readonly auditLogService: AuditLogService,
+    private readonly mailService: MailService,
   ) {}
 
   @Get()
@@ -147,8 +155,21 @@ export class AdminDocumentController {
   }
   @Delete(':id')
   @ApiOperation({ summary: 'Delete document' })
-  delete(@Param('id') id: string) {
-    return this.documentService.deleteAsAdmin(id);
+  async delete(@Param('id') id: string, @Req() req) {
+    const doc = await this.documentService.findById(id);
+    const result = await this.documentService.deleteAsAdmin(id);
+
+    await this.auditLogService.logAdminAction({
+      adminUserId: req.user?._id?.toString?.() ?? req.user?.id ?? 'system',
+      action: 'deleted_document',
+      targetType: 'document',
+      targetId: id,
+      targetName: doc.title,
+      details: `Admin deleted document ${doc.title}`,
+      timestamp: new Date(),
+    });
+
+    return result;
   }
   @Patch(':id/status')
   @ApiBearerAuth('JWT-auth')
@@ -168,7 +189,49 @@ export class AdminDocumentController {
     description: 'Forbidden — admin access required',
   })
   @ApiResponse({ status: 404, description: 'Document not found' })
-  changeStatus(@Param('id') id: string, @Body() dto: ChangeStatusDto) {
-    return this.documentService.changeStatus(id, dto.status);
+  async changeStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangeStatusDto,
+    @Req() req,
+  ) {
+    const existingDoc = await this.documentService.findById(id);
+    const updatedDoc = await this.documentService.changeStatus(id, dto.status);
+    const adminUserId =
+      req.user?._id?.toString?.() ??
+      req.user?.id ??
+      req.user?.email ??
+      'system';
+
+    if (existingDoc.userId) {
+      const user = await this.userService.getUser({
+        _id: new ObjectId(existingDoc.userId),
+      });
+
+      if (dto.status === DocumentStatus.APPROVED && user?.email) {
+        await this.mailService.sendDocumentApprovedEmail(
+          user.email,
+          updatedDoc.title,
+        );
+      }
+
+      if (dto.status === DocumentStatus.REJECTED && user?.email) {
+        await this.mailService.sendDocumentRejectedEmail(
+          user.email,
+          updatedDoc.title,
+        );
+      }
+    }
+
+    await this.auditLogService.logAdminAction({
+      adminUserId,
+      action: `${dto.status}_document`,
+      targetType: 'document',
+      targetId: String(existingDoc._id),
+      targetName: existingDoc.title,
+      details: `Admin set document status to ${dto.status}`,
+      timestamp: new Date(),
+    });
+
+    return updatedDoc;
   }
 }

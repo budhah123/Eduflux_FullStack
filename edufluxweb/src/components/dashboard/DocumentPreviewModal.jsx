@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
-import { useToast } from "../../context/ToastContext";
-import { useViewDocument } from "../../hooks/useViewDocument";
-import DocumentPreview from "./DocumentPreview";
+import { useState, useEffect } from 'react';
+import { useToast } from '../../context/ToastContext';
+import { useViewDocument } from '../../hooks/useViewDocument';
+import DocumentPreview from './DocumentPreview';
 
 const getSafeExtension = (fileType, fileFormat, fileUrl) => {
   if (fileType) return fileType;
   if (fileFormat) return fileFormat;
-  if (!fileUrl) return "";
+  if (!fileUrl) return '';
   const parts = fileUrl.split('?')[0].split('/');
   const filename = parts[parts.length - 1];
   const dotIndex = filename.lastIndexOf('.');
-  return dotIndex !== -1 ? filename.slice(dotIndex + 1) : "";
+  return dotIndex !== -1 ? filename.slice(dotIndex + 1) : '';
 };
 
 /**
@@ -20,8 +20,7 @@ const getSafeExtension = (fileType, fileFormat, fileUrl) => {
  * Uses PDF.js (via DocumentPreview) for PDFs and Office docs,
  * and standard <img> for image files.
  *
- * Securely routes all file requests through the server-side proxy
- * GET /documents/view/:id to get a temporary local blob URL.
+ * Securely resolves file previews through the server-side preview URL route.
  *
  * Props:
  *  - isOpen: boolean
@@ -51,17 +50,17 @@ export default function DocumentPreviewModal({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
   // Prevent body scroll while modal is open
   useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "";
+    document.body.style.overflow = isOpen ? 'hidden' : '';
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = '';
     };
   }, [isOpen]);
 
@@ -77,23 +76,23 @@ export default function DocumentPreviewModal({
 
     // Mock documents get loaded directly
     const isMock =
-      doc._id?.startsWith("mock") || ["1", "2", "3"].includes(doc._id);
+      doc._id?.startsWith('mock') || ['1', '2', '3'].includes(doc._id);
     if (isMock) {
       // Resolve mock Office docs conversion url if needed
       const ext = getSafeExtension(fileType, doc.fileFormat, doc.fileUrl)
         .toLowerCase()
         .trim();
       const isOfficeType = [
-        "doc",
-        "docx",
-        "xls",
-        "xlsx",
-        "ppt",
-        "pptx",
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'ppt',
+        'pptx',
       ].includes(ext);
       let url = doc.fileUrl;
       if (isOfficeType && url) {
-        url = url.replace("/raw/upload/", "/image/upload/") + ".pdf";
+        url = url.replace('/raw/upload/', '/image/upload/') + '.pdf';
       }
       setPreviewUrl(url);
       setPreviewLoading(false);
@@ -113,27 +112,27 @@ export default function DocumentPreviewModal({
       doc._id,
       ext,
       (result) => {
-        if (result?.kind === "html") {
-          setPreviewHtml(result.html || "");
+        if (result?.kind === 'html') {
+          setPreviewHtml(result.html || '');
           setPreviewLoading(false);
           return;
         }
 
-        if (result?.kind === "url") {
+        if (result?.kind === 'url') {
           setPreviewUrl(result.url || null);
           setPreviewLoading(false);
           return;
         }
 
-        if (result?.kind === "unsupported") {
+        if (result?.kind === 'unsupported') {
           setPreviewError(
-            result.message || "Preview not supported for this file type.",
+            result.message || 'Preview not supported for this file type.',
           );
           setPreviewLoading(false);
           return;
         }
 
-        setPreviewError("Preview not supported for this file type.");
+        setPreviewError('Preview not supported for this file type.');
         setPreviewLoading(false);
       },
       { autoRevoke: true },
@@ -143,7 +142,7 @@ export default function DocumentPreviewModal({
   // Revoke object URL on unmount or when previewUrl changes
   useEffect(() => {
     return () => {
-      if (previewUrl && !previewUrl.startsWith("http")) {
+      if (previewUrl && !previewUrl.startsWith('http')) {
         URL.revokeObjectURL(previewUrl);
       }
     };
@@ -156,15 +155,15 @@ export default function DocumentPreviewModal({
     .toLowerCase()
     .trim();
 
-  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(
+  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(
     resolvedExt,
   );
-  const isPdf = resolvedExt === "pdf";
-  const isDocx = resolvedExt === "docx";
-  const isOfficeType = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(
+  const isPdf = resolvedExt === 'pdf';
+  const isDocx = resolvedExt === 'docx';
+  const isOfficeType = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(
     resolvedExt,
   );
-  const isText = ["txt", "html"].includes(resolvedExt);
+  const isText = ['txt', 'html'].includes(resolvedExt);
   const canPreview = isImage || isPdf || isOfficeType || isText;
 
   // Display label (upper-cased for the UI)
@@ -291,8 +290,8 @@ export default function DocumentPreviewModal({
                     Preview Not Supported
                   </h4>
                   <p className="text-body-sm text-text-muted mb-6">
-                    In-browser preview is not available for{" "}
-                    <b>{resolvedExt ? `.${resolvedExt}` : "this type of"}</b>{" "}
+                    In-browser preview is not available for{' '}
+                    <b>{resolvedExt ? `.${resolvedExt}` : 'this type of'}</b>{' '}
                     files. Download the file to view it on your device.
                   </p>
                   {onDownload && (

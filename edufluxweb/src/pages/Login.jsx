@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { setAuthTokens } from '../utils/auth';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,7 +25,10 @@ export default function Login() {
     if (initialMessage) {
       showToast(initialMessage, 'success');
       // Clear location state so refreshing or navigating back won't re-trigger
-      navigate(location.pathname, { replace: true, state: { email: initialEmail } });
+      navigate(location.pathname, {
+        replace: true,
+        state: { email: initialEmail },
+      });
     }
   }, [initialMessage]);
 
@@ -71,8 +75,10 @@ export default function Login() {
 
       showToast('Login completed successfully');
       setSuccess('Login successful! Redirecting to dashboard...');
-      sessionStorage.setItem('accessToken', data.accessToken);
-      sessionStorage.setItem('refreshToken', data.refreshToken);
+      setAuthTokens({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
 
       setTimeout(() => {
         navigate('/dashboard');

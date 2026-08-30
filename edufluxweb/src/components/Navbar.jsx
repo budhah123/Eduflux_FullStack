@@ -2,6 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../services/api/apiClient';
 import NotificationBell from './NotificationBell';
+import {
+  clearAuthTokens,
+  decodeTokenPayload,
+  getAccessToken,
+} from '../utils/auth';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -14,32 +19,9 @@ export default function Navbar() {
   const location = useLocation();
   const menuRef = useRef(null);
 
-  const getStoredToken = () =>
-    sessionStorage.getItem('accessToken') ||
-    localStorage.getItem('accessToken');
+  const getStoredToken = () => getAccessToken();
 
-  const decodeToken = (token) => {
-    if (!token) return null;
-    try {
-      const base64Url = token.split('.')[1];
-      if (!base64Url) return null;
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(
-        decodeURIComponent(
-          window
-            .atob(base64)
-            .split('')
-            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join(''),
-        ),
-      );
-      const expiryMs = payload.exp ? payload.exp * 1000 : null;
-      if (expiryMs && expiryMs <= Date.now()) return null;
-      return payload;
-    } catch {
-      return null;
-    }
-  };
+  const decodeToken = (token) => decodeTokenPayload(token);
 
   const buildProfileFromPayload = (payload) => {
     if (!payload) return null;
@@ -172,7 +154,9 @@ export default function Navbar() {
         if (firstName !== undefined) next.firstName = firstName;
         if (lastName !== undefined) next.lastName = lastName;
         if (firstName !== undefined || lastName !== undefined) {
-          next.fullName = [next.firstName, next.lastName].filter(Boolean).join(' ');
+          next.fullName = [next.firstName, next.lastName]
+            .filter(Boolean)
+            .join(' ');
         }
         if (avatarUrl !== undefined) next.avatarUrl = avatarUrl;
         return next;
@@ -181,7 +165,10 @@ export default function Navbar() {
 
     window.addEventListener('eduflux-profile-updated', handleProfileUpdate);
     return () => {
-      window.removeEventListener('eduflux-profile-updated', handleProfileUpdate);
+      window.removeEventListener(
+        'eduflux-profile-updated',
+        handleProfileUpdate,
+      );
     };
   }, []);
 
@@ -200,16 +187,13 @@ export default function Navbar() {
   }, [menuOpen]);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('accessToken');
-    sessionStorage.removeItem('refreshToken');
+    clearAuthTokens();
     sessionStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setMenuOpen(false);
     setUserProfile(null);
     setAuthLoading(false);
-    navigate('/');
+    navigate('/login');
   };
 
   const handleNavClick = (e, key, to, sectionId) => {
@@ -219,17 +203,23 @@ export default function Navbar() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (sectionId) {
         e.preventDefault();
-        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({ behavior: 'smooth' });
       } else if (to === '/pricing') {
         e.preventDefault();
-        document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+        document
+          .getElementById('pricing')
+          ?.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
       if (sectionId) {
         e.preventDefault();
         navigate('/');
         setTimeout(() => {
-          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+          document
+            .getElementById(sectionId)
+            ?.scrollIntoView({ behavior: 'smooth' });
         }, 120);
       }
     }

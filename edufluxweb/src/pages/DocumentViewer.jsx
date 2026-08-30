@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { decodeTokenPayload, getAccessToken } from '../utils/auth';
 import { documentApi } from '../services/api/documentApi';
 import { bookmarkApi } from '../services/api/bookmarkApi';
 import BookmarkButton from '../components/BookmarkButton';
@@ -8,10 +9,63 @@ import { useViewDocument } from '../hooks/useViewDocument';
 import DocumentChatPanel from '../components/DocumentChatPanel';
 import mammoth from 'mammoth/mammoth.browser';
 import { Document as PdfDocument, Page as PdfPage, pdfjs } from 'react-pdf';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+function PageWithObserver({ pageNum, scale, onVisible, pageRef, rootRef }) {
+  const ref = useRef(null);
+  const [isNear, setIsNear] = useState(pageNum <= 2);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsNear(true);
+          onVisible(pageNum);
+        }
+      },
+      { root: rootRef.current, rootMargin: '800px 0px', threshold: 0.1 },
+    );
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [pageNum, onVisible, rootRef]);
+
+  const setPageRef = (element) => {
+    ref.current = element;
+    if (element) pageRef.current.set(pageNum, element);
+    else pageRef.current.delete(pageNum);
+  };
+
+  return (
+    <div
+      ref={setPageRef}
+      className="mb-4 bg-white shadow-xl rounded-xl overflow-hidden border border-outline-variant"
+    >
+      {isNear ? (
+        <PdfPage
+          pageNumber={pageNum}
+          scale={scale}
+          renderTextLayer
+          renderAnnotationLayer
+        />
+      ) : (
+        <div
+          style={{ width: 600 * scale, height: 800 * scale }}
+          className="flex items-center justify-center text-text-muted"
+        >
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getSafeExtension = (fileFormat, fileUrl) => {
   if (fileFormat) return fileFormat;
@@ -138,7 +192,8 @@ export default function DocumentViewer({
       }
     } catch (err) {
       console.error('Error toggling bookmark:', err);
-      if (showToast) showToast(err.message || 'Failed to update bookmark', 'error');
+      if (showToast)
+        showToast(err.message || 'Failed to update bookmark', 'error');
     }
   };
 
@@ -158,7 +213,10 @@ export default function DocumentViewer({
 
   // Refs
   const previewContainerRef = useRef(null);
-  const pdfPageRef = useRef(null);
+  const pdfPageRefs = useRef(new Map());
+  const pdfScrollContainerRef = useRef(null);
+  const documentRef = useRef(document);
+  documentRef.current = document;
 
   const previewFileType = getSafeExtension(
     document?.fileFormat,
@@ -167,7 +225,8 @@ export default function DocumentViewer({
     .toLowerCase()
     .trim();
   const isPdfPreview = Boolean(previewUrl && previewFileType === 'pdf');
-  const hasPageCount = isPdfPreview && Number.isFinite(totalPages) && totalPages > 0;
+  const hasPageCount =
+    isPdfPreview && Number.isFinite(totalPages) && totalPages > 0;
 
   // Determine actual lock state (forcedState > document.isLocked)
   const isLocked =
@@ -186,28 +245,20 @@ export default function DocumentViewer({
     setPage(1);
     setTotalPages(null);
     setScale(1.0);
-  }, [id, overrideDoc]);
+    pdfPageRefs.current.clear();
+  }, [id, overrideDoc?._id, overrideDoc?.fileUrl]);
 
   // Sync user info from token
   useEffect(() => {
-    const token = sessionStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (token) {
       try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(
-          window
-            .atob(base64)
-            .split('')
-            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join(''),
-        );
-        const payload = JSON.parse(jsonPayload);
+        const payload = decodeTokenPayload(token);
         const name =
-          payload.name ||
-          payload.username ||
-          (payload.email && payload.email.split('@')[0]);
-        const role = payload.role || 'Researcher';
+          payload?.name ||
+          payload?.username ||
+          (payload?.email && payload.email.split('@')[0]);
+        const role = payload?.role || 'Researcher';
         setCurrentUser({
           name: name
             ? name.charAt(0).toUpperCase() + name.slice(1)
@@ -281,7 +332,7 @@ export default function DocumentViewer({
         }
       } catch (e) {
         console.warn('Upload progress fetch fallback to document state:', e);
-        const approved = document?.approvedUploadCount ?? 1;
+        const approved = documentRef.current?.approvedUploadCount ?? 1;
         setUploadProgress({
           approvedUploadCount: approved,
           uploadsUntilNextCredit: Math.max(0, 3 - approved),
@@ -291,7 +342,7 @@ export default function DocumentViewer({
     };
 
     fetchUploadProgress();
-  }, [document, overrideUploadProgress]);
+  }, [id, overrideUploadProgress]);
 
   // Fetch preview document content (Only if unlocked)
   useEffect(() => {
@@ -308,6 +359,7 @@ export default function DocumentViewer({
     setTotalPages(null);
     setPdfLoading(true);
     setPdfError(null);
+    pdfPageRefs.current.clear();
 
     const fileType = getSafeExtension(document.fileFormat, document.fileUrl)
       .toLowerCase()
@@ -334,23 +386,42 @@ export default function DocumentViewer({
       return;
     }
 
-    // Default to url or preview helper
-    if (document.fileUrl) {
-      setPreviewUrl(document.fileUrl);
+    let blobObjectUrl = null;
+
+    const safetyTimer = window.setTimeout(() => {
       setPreviewLoading(false);
-    } else {
-      previewDocument(
-        id,
-        fileType,
-        (result) => {
-          if (result?.kind === 'html') setPreviewHtml(result.html);
-          if (result?.kind === 'url') setPreviewUrl(result.url);
-          setPreviewLoading(false);
-        },
-        { autoRevoke: false },
-      );
-    }
-  }, [id, document, isLocked, overrideDoc, previewDocument]);
+      setPreviewError('Taking too long to load — please refresh');
+    }, 15000);
+
+    previewDocument(
+      id,
+      fileType,
+      (result) => {
+        if (result?.kind === 'html') setPreviewHtml(result.html);
+        if (result?.kind === 'url') {
+          blobObjectUrl = result.url; // track so we can revoke it on cleanup
+          setPreviewUrl(result.url);
+        }
+        if (result?.kind === 'unsupported') setPreviewError(result.message);
+        setPreviewLoading(false);
+        window.clearTimeout(safetyTimer);
+      },
+      { autoRevoke: false },
+    );
+
+    return () => {
+      window.clearTimeout(safetyTimer);
+      // Revoke the blob URL to free memory when navigating away or changing doc
+      if (blobObjectUrl) URL.revokeObjectURL(blobObjectUrl);
+    };
+  }, [
+    id,
+    document?.fileFormat,
+    document?.fileUrl,
+    isLocked,
+    overrideDoc?._id,
+    previewDocument,
+  ]);
 
   // Fetch related resources
   useEffect(() => {
@@ -369,10 +440,10 @@ export default function DocumentViewer({
       }
     };
 
-    if (document) {
+    if (documentRef.current) {
       fetchRelated();
     }
-  }, [id, document]);
+  }, [id, Boolean(document)]);
 
   // Sync pdf load state
   useEffect(() => {
@@ -389,8 +460,9 @@ export default function DocumentViewer({
     setPdfError(null);
   };
 
-  const onPdfLoadError = () => {
-    setPdfError('Failed to render PDF preview');
+  const onPdfLoadError = (err) => {
+    console.error('PDF.js load error:', err);
+    setPdfError(err?.message || 'Failed to render PDF preview');
     setPdfLoading(false);
     setTotalPages(null);
   };
@@ -490,11 +562,12 @@ export default function DocumentViewer({
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 2.5));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
 
-  useEffect(() => {
-    if (isPdfPreview && pdfPageRef.current) {
-      pdfPageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollToPage = (pageNum) => {
+    const pageElement = pdfPageRefs.current.get(pageNum);
+    if (pageElement) {
+      pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, [isPdfPreview, page]);
+  };
 
   const handleToggleFullscreen = () => {
     const element = previewContainerRef.current;
@@ -833,14 +906,14 @@ export default function DocumentViewer({
                 ) : (
                   /* STATE 2: UNLOCKED FULL ACCESS DESIGN */
                   <div className="w-full flex flex-col items-center justify-center relative">
-                    {previewLoading || (isPdfPreview && pdfLoading) ? (
+                    {previewLoading ? (
                       <div className="flex flex-col items-center gap-3 text-text-muted py-24">
                         <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin mb-2" />
                         <span className="text-sm font-medium">
                           Loading document viewer...
                         </span>
                       </div>
-                    ) : pdfError ? (
+                    ) : previewError ? (
                       <div className="w-full max-w-[800px] rounded-xl border border-outline-variant bg-white p-8 md:p-12 shadow-xl text-center">
                         <span className="material-symbols-outlined text-4xl text-error mb-3">
                           error
@@ -848,7 +921,7 @@ export default function DocumentViewer({
                         <p className="font-semibold text-on-surface mb-2">
                           Preview Error
                         </p>
-                        <p className="text-sm text-text-muted">{pdfError}</p>
+                        <p className="text-sm text-text-muted">{previewError}</p>
                       </div>
                     ) : previewHtml ? (
                       <div className="w-full max-w-[800px] overflow-auto bg-white rounded-xl border border-outline-variant shadow-xl">
@@ -862,37 +935,48 @@ export default function DocumentViewer({
                         />
                       </div>
                     ) : isPdfPreview && previewUrl ? (
-                      <div className="w-full max-w-[900px] flex justify-center overflow-auto">
-                        <div ref={pdfPageRef} className="bg-white shadow-xl rounded-xl overflow-hidden border border-outline-variant">
-                          <PdfDocument
-                            file={previewUrl}
-                            onLoadSuccess={onPdfLoadSuccess}
-                            onLoadError={onPdfLoadError}
-                            loading={null}
-                            className="flex justify-center"
-                          >
-                            <PdfPage
-                              pageNumber={page}
-                              scale={scale}
-                              renderTextLayer={true}
-                              renderAnnotationLayer={true}
-                              loading={
-                                <div
-                                  className="flex items-center justify-center text-text-muted py-12 select-none"
-                                  style={{
-                                    width: 600 * scale,
-                                    height: 800 * scale,
-                                  }}
-                                >
-                                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2" />
-                                  <span className="text-xs">
-                                    Loading Page {page}...
-                                  </span>
-                                </div>
-                              }
-                            />
-                          </PdfDocument>
-                        </div>
+                      <div
+                        ref={pdfScrollContainerRef}
+                        className="w-full max-w-[900px] mx-auto overflow-y-auto"
+                        style={{ maxHeight: '85vh' }}
+                      >
+                        {pdfLoading && (
+                          <div className="flex flex-col items-center gap-3 text-text-muted py-24">
+                            <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin mb-2" />
+                            <span className="text-sm font-medium">
+                              Rendering PDF pages...
+                            </span>
+                          </div>
+                        )}
+                        {pdfError && (
+                          <div className="w-full max-w-[800px] rounded-xl border border-outline-variant bg-white p-8 md:p-12 shadow-xl text-center mx-auto my-8">
+                            <span className="material-symbols-outlined text-4xl text-error mb-3">
+                              error
+                            </span>
+                            <p className="font-semibold text-on-surface mb-2">
+                              PDF Render Error
+                            </p>
+                            <p className="text-sm text-text-muted">{pdfError}</p>
+                          </div>
+                        )}
+                        <PdfDocument
+                          file={previewUrl}
+                          onLoadSuccess={onPdfLoadSuccess}
+                          onLoadError={onPdfLoadError}
+                          loading={null}
+                        >
+                          {Boolean(totalPages) &&
+                            Array.from({ length: totalPages }, (_, index) => (
+                              <PageWithObserver
+                                key={index + 1}
+                                pageNum={index + 1}
+                                scale={scale}
+                                onVisible={setPage}
+                                pageRef={pdfPageRefs}
+                                rootRef={pdfScrollContainerRef}
+                              />
+                            ))}
+                        </PdfDocument>
                       </div>
                     ) : (
                       <div
@@ -955,7 +1039,11 @@ export default function DocumentViewer({
                   <div className="flex items-center gap-2">
                     <button
                       disabled={page <= 1}
-                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() => {
+                        const targetPage = Math.max(page - 1, 1);
+                        setPage(targetPage);
+                        scrollToPage(targetPage);
+                      }}
                       className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
                     >
                       <span className="material-symbols-outlined">
@@ -967,9 +1055,11 @@ export default function DocumentViewer({
                     </span>
                     <button
                       disabled={page >= totalPages}
-                      onClick={() =>
-                        setPage((prev) => Math.min(prev + 1, totalPages))
-                      }
+                      onClick={() => {
+                        const targetPage = Math.min(page + 1, totalPages);
+                        setPage(targetPage);
+                        scrollToPage(targetPage);
+                      }}
                       className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-all text-on-surface disabled:opacity-30 cursor-pointer"
                     >
                       <span className="material-symbols-outlined">
@@ -979,7 +1069,9 @@ export default function DocumentViewer({
                   </div>
                 )}
 
-                {hasPageCount && <div className="h-6 w-px bg-outline-variant"></div>}
+                {hasPageCount && (
+                  <div className="h-6 w-px bg-outline-variant"></div>
+                )}
 
                 <div className="flex items-center gap-3">
                   <button
@@ -1127,7 +1219,9 @@ export default function DocumentViewer({
                 <BookmarkButton
                   documentId={id}
                   isBookmarked={saved}
-                  onToggle={(docId, nextState) => handleToggleBookmark(docId, nextState)}
+                  onToggle={(docId, nextState) =>
+                    handleToggleBookmark(docId, nextState)
+                  }
                   variant="viewer"
                 />
               </div>

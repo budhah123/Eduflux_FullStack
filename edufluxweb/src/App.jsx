@@ -13,6 +13,7 @@ import Subscription from './pages/Subscription';
 import PricingUnlock from './pages/PricingUnlock';
 import PaymentCallback from './pages/PaymentCallback';
 import { ToastProvider } from './context/ToastContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Admin Components
 import AdminLayout from './admin/AdminLayout';
@@ -34,15 +35,17 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/my-upload" element={<Dashboard />} />
-          <Route path="/browse-panel" element={<Dashboard />} />
-          <Route path="/ai-chat" element={<Dashboard />} />
-          <Route path="/bookmarks" element={<Dashboard />} />
-          <Route path="/settings" element={<Dashboard />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/my-upload" element={<Dashboard />} />
+            <Route path="/browse-panel" element={<Dashboard />} />
+            <Route path="/ai-chat" element={<Dashboard />} />
+            <Route path="/bookmarks" element={<Dashboard />} />
+            <Route path="/settings" element={<Dashboard />} />
+            <Route path="/subscription" element={<Subscription />} />
+          </Route>
           <Route path="/pricing" element={<PricingUnlock />} />
           <Route path="/unlock" element={<PricingUnlock />} />
-          <Route path="/subscription" element={<Subscription />} />
           <Route
             path="/subscription/khalti/callback"
             element={<PaymentCallback provider="khalti" />}

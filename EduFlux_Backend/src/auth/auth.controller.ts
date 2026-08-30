@@ -37,6 +37,8 @@ import { UpdatePasswordInput } from './dto/update-password.input';
 import { AtGuard, CurrentUser } from './decorator';
 import { AuthType } from './enum/auth-type.enum';
 import type { Response } from 'express';
+import { RefreshTokenGuard } from './guards';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -46,6 +48,7 @@ export class AuthController {
     private readonly userService: UserService,
   ) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60 } })
   @Post('register')
   @ApiOperation({ summary: 'Register a user' })
   @ApiCreatedResponse({
@@ -70,6 +73,7 @@ export class AuthController {
     return user;
   }
 
+  @Throttle({ default: { limit: 8, ttl: 60 } })
   @Post('login')
   @ApiOperation({ summary: 'Login a user' })
   @ApiCreatedResponse({
@@ -82,12 +86,22 @@ export class AuthController {
     const user = await this.authService.validateUser(email, password);
 
     if (!user.isVerified) {
-      // ← add this check
       throw new BadRequestException(
         'Please verify your email before logging in',
       );
     }
     return await this.authService.generateTokens(user);
+  }
+
+  @UseGuards(RefreshTokenGuard)
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+  async refresh(@Req() req: any) {
+    const user = req.user;
+    if (!user) {
+      throw new BadRequestException('Refresh token is invalid');
+    }
+    return this.authService.generateTokens(user);
   }
 
   @Post('verify-email')
@@ -98,6 +112,7 @@ export class AuthController {
     return { message: 'Email verified successfully' };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60 } })
   @Post('resend-verification')
   @ApiOperation({ summary: 'Resend email verification OTP' })
   async resendVerification(@Body() dto: CheckUserInput) {
@@ -176,6 +191,7 @@ export class AuthController {
     return { message: 'Password updated successfully' };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Forgot password' })
   @ApiCreatedResponse({
@@ -204,6 +220,7 @@ export class AuthController {
     return { message: 'Password has been reset successfully' };
   }
 
+  @Throttle({ default: { limit: 8, ttl: 60 } })
   @Post('verify-otp')
   @ApiOperation({ summary: 'Verify OTP' })
   @ApiCreatedResponse({

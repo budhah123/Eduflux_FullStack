@@ -10,14 +10,11 @@ import {
   Req,
   UploadedFile,
   UseInterceptors,
-  Res,
   NotFoundException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import * as express from 'express';
-import axios, { AxiosResponse } from 'axios';
-import { Readable } from 'stream';
 import {
   ApiTags,
   ApiOperation,
@@ -28,8 +25,6 @@ import {
 import { DocumentsService } from './documents.service';
 import { FileUploadService } from '@app/file-upload';
 import { FilterDocumentDto } from './dto/filter-document.dto';
-import * as path from 'path';
-import * as fs from 'fs';
 import {
   CreateDocumentInput,
   UpdateDocumentInput,
@@ -90,123 +85,6 @@ export class DocumentsController {
     return this.documentsService.findMyUploads(req.user._id, filter);
   }
 
-  @Get('/view/:id')
-  @AtGuard()
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'View document' })
-  async viewFile(
-    @Param('id') id: string,
-    @Res() res: express.Response,
-    @Req() req,
-  ) {
-    const document = await this.documentsService.findById(id);
-    if (!document) {
-      throw new NotFoundException(`Document with id: ${id} not found`);
-    }
-
-    // access gate — block premium doc stream if not unlocked
-    if (document.isPremiumOnly) {
-      const result = await this.accessService.checkAccess(req.user);
-      if (!result.access) {
-        throw new ForbiddenException(
-          'Subscribe via Khalti/eSewa or upload 3 documents to unlock this document',
-        );
-      }
-    }
-
-    const isRemote =
-      document.fileUrl.startsWith('http://') ||
-      document.fileUrl.startsWith('https://');
-
-    if (isRemote) {
-      try {
-        const format =
-          document.fileFormat || document.fileUrl.split('.').pop() || 'pdf';
-        const signedUrl = await this.uploadService.createSignedUrl(
-          document.fileKey,
-          format,
-          document.resourceType || 'raw',
-          document.fileVersion,
-        );
-
-        const response: AxiosResponse = await axios({
-          method: 'get',
-          url: signedUrl,
-          responseType: 'stream',
-        });
-
-        const extension = `.${format.toLowerCase()}`;
-
-        const mimeTypes: Record<string, string> = {
-          '.pdf': 'application/pdf',
-          '.jpg': 'image/jpeg',
-          '.jpeg': 'image/jpeg',
-          '.png': 'image/png',
-          '.gif': 'image/gif',
-          '.webp': 'image/webp',
-          '.svg': 'image/svg+xml',
-          '.txt': 'text/plain',
-          '.html': 'text/html',
-          '.docx':
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          '.doc': 'application/msword',
-          '.xlsx':
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          '.xls': 'application/vnd.ms-excel',
-          '.pptx':
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          '.ppt': 'application/vnd.ms-powerpoint',
-        };
-
-        const contentType =
-          mimeTypes[extension] ||
-          (response.headers['content-type'] as string | undefined) ||
-          'application/octet-stream';
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', 'inline');
-        (response.data as Readable).pipe(res);
-        return;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('Failed to stream remote document:', message);
-        return res.redirect(document.fileUrl);
-      }
-    }
-
-    const filePath = path.isAbsolute(document.fileUrl)
-      ? document.fileUrl
-      : path.join(process.cwd(), document.fileUrl);
-
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundException(`File not found at: ${filePath}`);
-    }
-
-    const extension = path.extname(document.fileUrl).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.pdf': 'application/pdf',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.txt': 'text/plain',
-      '.html': 'text/html',
-      '.docx':
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.doc': 'application/msword',
-      '.xlsx':
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.xls': 'application/vnd.ms-excel',
-      '.pptx':
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      '.ppt': 'application/vnd.ms-powerpoint',
-    };
-
-    const contentType = mimeTypes[extension] || 'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
-    res.sendFile(filePath);
-  }
-
   @Get(':id/preview-url')
   @AtGuard()
   @ApiBearerAuth('JWT-auth')
@@ -225,10 +103,15 @@ export class DocumentsController {
     }
 
     const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
+    if (!doc.resourceType) {
+      throw new InternalServerErrorException(
+        `Document ${doc._id} is missing resourceType — run fix-resource-types.ts`,
+      );
+    }
     const url = await this.uploadService.createSignedUrl(
       doc.fileKey,
       format,
-      doc.resourceType || 'raw',
+      doc.resourceType,
       doc.fileVersion,
     );
 
@@ -252,12 +135,17 @@ export class DocumentsController {
       }
     }
 
-    await this.documentsService.incrementDownload(id);
     const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
+    if (!doc.resourceType) {
+      throw new InternalServerErrorException(
+        `Document ${doc._id} is missing resourceType — run fix-resource-types.ts`,
+      );
+    }
+    await this.documentsService.incrementDownload(id);
     const signedUrl = await this.uploadService.createSignedUrl(
       doc.fileKey,
       format,
-      doc.resourceType || 'raw',
+      doc.resourceType,
       doc.fileVersion,
     );
     return { url: signedUrl };

@@ -15,7 +15,11 @@ function loadEnv() {
     const parts = trimmed.split('=');
     if (parts.length >= 2) {
       const key = parts[0].trim();
-      const val = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+      const val = parts
+        .slice(1)
+        .join('=')
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
       process.env[key] = val;
     }
   }
@@ -45,6 +49,8 @@ async function run() {
       console.log(`  fileKey: ${doc.fileKey}`);
       console.log(`  resourceType: ${doc.resourceType}`);
       console.log(`  fileVersion: ${doc.fileVersion}`);
+      console.log(`  fileFormat: ${doc.fileFormat}`);
+      console.log(`  fileUrl: ${doc.fileUrl}`);
       console.log('--------------------------------------');
     }
   } catch (error) {

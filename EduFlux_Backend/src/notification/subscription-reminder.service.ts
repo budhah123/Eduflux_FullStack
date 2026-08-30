@@ -8,6 +8,9 @@ import { NotificationService } from './notification.service';
 import { NotificationType } from './enum';
 import { SubscriptionEntity } from '../subscription/entity';
 import { SubscriptionStatus } from 'src/subscription/enum/subscription-status.enum';
+import { UserService } from 'src/user/user.service';
+import { MailService } from '@app/mail';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class SubscriptionReminderService {
@@ -15,6 +18,8 @@ export class SubscriptionReminderService {
     @InjectRepository(SubscriptionEntity)
     private subscriptionRepository: MongoRepository<SubscriptionEntity>,
     private notificationService: NotificationService,
+    private readonly userService: UserService,
+    private readonly mailService: MailService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
@@ -42,6 +47,17 @@ export class SubscriptionReminderService {
             message: `Your subscription expires on ${sub.expiryDate.toDateString()}. Renew to keep access.`,
             link: '/subscription',
           });
+
+          const user = await this.userService.getUser({
+            _id: new ObjectId(userId),
+          });
+
+          if (user?.email) {
+            await this.mailService.sendSubscriptionExpiringEmail(
+              user.email,
+              sub.expiryDate,
+            );
+          }
         }
       }
     }

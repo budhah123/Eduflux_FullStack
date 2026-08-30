@@ -92,7 +92,6 @@ export class FileUploadService {
     format: string,
     resourceType: string = 'raw',
     version?: string,
-    expiresIn = 3600,
   ): Promise<string> {
     try {
       const escapedFormat = format.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -106,9 +105,7 @@ export class FileUploadService {
         type: 'upload',
         format: resourceType === 'raw' ? undefined : format,
         version: version ? Number(version) : undefined,
-        sign_url: true,
         secure: true,
-        expires_at: Math.floor(Date.now() / 1000) + expiresIn,
       });
 
       if (!signedUrl) {

@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { useToast } from '../context/ToastContext'
-import Sidebar from '../components/dashboard/Sidebar'
-import Header from '../components/dashboard/Header'
-import OverviewPanel from '../components/dashboard/OverviewPanel'
-import BrowsePanel from '../components/dashboard/BrowsePanel'
-import MyUploadsPanel from '../components/dashboard/MyUploadsPanel'
-import AIChatPanel from '../components/dashboard/AIChatPanel'
-import BookmarksPanel from '../components/dashboard/BookmarksPanel'
-import SettingsPanel from '../components/dashboard/SettingsPanel'
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
+import Sidebar from '../components/dashboard/Sidebar';
+import { getAccessToken } from '../utils/auth';
+import Header from '../components/dashboard/Header';
+import OverviewPanel from '../components/dashboard/OverviewPanel';
+import BrowsePanel from '../components/dashboard/BrowsePanel';
+import MyUploadsPanel from '../components/dashboard/MyUploadsPanel';
+import AIChatPanel from '../components/dashboard/AIChatPanel';
+import BookmarksPanel from '../components/dashboard/BookmarksPanel';
+import SettingsPanel from '../components/dashboard/SettingsPanel';
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { showToast } = useToast()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState(() => {
     if (window.location.pathname === '/my-upload') return 'My Uploads';
@@ -28,62 +29,66 @@ export default function Dashboard() {
       return stored;
     }
     return 'Overview';
-  })
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  });
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   useEffect(() => {
-    const token = sessionStorage.getItem('accessToken')
+    const token = getAccessToken();
     if (!token) {
-      navigate('/login')
+      navigate('/login');
     }
-  }, [navigate])
+  }, [navigate]);
 
   useEffect(() => {
     if (location.pathname === '/my-upload') {
-      setActiveTab('My Uploads')
+      setActiveTab('My Uploads');
     } else if (location.pathname === '/browse-panel') {
-      setActiveTab('Browse')
+      setActiveTab('Browse');
     } else if (location.pathname === '/ai-chat') {
-      setActiveTab('AI Chat')
+      setActiveTab('AI Chat');
     } else if (location.pathname === '/bookmarks') {
-      setActiveTab('Bookmarks')
+      setActiveTab('Bookmarks');
     } else if (location.pathname === '/settings') {
-      setActiveTab('Settings')
+      setActiveTab('Settings');
     } else if (location.pathname === '/dashboard') {
-      const stored = sessionStorage.getItem('dashboard_pending_tab')
+      const stored = sessionStorage.getItem('dashboard_pending_tab');
       if (stored) {
-        sessionStorage.removeItem('dashboard_pending_tab')
-        setActiveTab(stored)
-      } else if (['My Uploads', 'Browse', 'AI Chat', 'Bookmarks', 'Settings'].includes(activeTab)) {
-        setActiveTab('Overview')
+        sessionStorage.removeItem('dashboard_pending_tab');
+        setActiveTab(stored);
+      } else if (
+        ['My Uploads', 'Browse', 'AI Chat', 'Bookmarks', 'Settings'].includes(
+          activeTab,
+        )
+      ) {
+        setActiveTab('Overview');
       }
     }
-  }, [location.pathname])
+  }, [location.pathname]);
 
   const handleTabChange = (tabName) => {
     if (tabName === 'My Uploads') {
-      navigate('/my-upload')
+      navigate('/my-upload');
     } else if (tabName === 'Browse') {
-      navigate('/browse-panel')
+      navigate('/browse-panel');
     } else if (tabName === 'AI Chat') {
-      navigate('/ai-chat')
+      navigate('/ai-chat');
     } else if (tabName === 'Bookmarks') {
-      navigate('/bookmarks')
+      navigate('/bookmarks');
     } else if (tabName === 'Settings') {
-      navigate('/settings')
+      navigate('/settings');
     } else if (tabName === 'Subscription') {
-      navigate('/subscription')
+      navigate('/subscription');
     } else {
       if (location.pathname !== '/dashboard') {
         // Store intended tab so the remounted Dashboard can restore it
-        sessionStorage.setItem('dashboard_pending_tab', tabName)
-        navigate('/dashboard')
+        sessionStorage.setItem('dashboard_pending_tab', tabName);
+        navigate('/dashboard');
       } else {
-        setActiveTab(tabName)
+        setActiveTab(tabName);
       }
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background text-text-main flex overflow-hidden">
@@ -99,10 +104,7 @@ export default function Dashboard() {
       {/* Main Workspace Frame */}
       <div className="flex-1 flex flex-col md:ml-[240px] h-screen overflow-hidden">
         {/* Top App Header */}
-        <Header
-          activeTab={activeTab}
-          setMobileOpen={setMobileSidebarOpen}
-        />
+        <Header activeTab={activeTab} setMobileOpen={setMobileSidebarOpen} />
 
         {/* Scrollable Work Canvas */}
         <main className="flex-grow overflow-y-auto custom-scrollbar bg-surface-bright pb-10">
@@ -110,9 +112,7 @@ export default function Dashboard() {
             <OverviewPanel setActiveTab={handleTabChange} />
           )}
 
-          {activeTab === 'Browse' && (
-            <BrowsePanel />
-          )}
+          {activeTab === 'Browse' && <BrowsePanel />}
 
           {activeTab === 'My Uploads' && (
             <MyUploadsPanel
@@ -122,9 +122,7 @@ export default function Dashboard() {
             />
           )}
 
-          {activeTab === 'AI Chat' && (
-            <AIChatPanel showToast={showToast} />
-          )}
+          {activeTab === 'AI Chat' && <AIChatPanel showToast={showToast} />}
 
           {activeTab === 'Bookmarks' && (
             <BookmarksPanel
@@ -133,12 +131,9 @@ export default function Dashboard() {
             />
           )}
 
-          {activeTab === 'Settings' && (
-            <SettingsPanel showToast={showToast} />
-          )}
+          {activeTab === 'Settings' && <SettingsPanel showToast={showToast} />}
         </main>
       </div>
     </div>
-  )
+  );
 }
-
