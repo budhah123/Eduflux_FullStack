@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { UploadCloud } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { decodeTokenPayload, getAccessToken } from '../utils/auth';
 import { documentApi } from '../services/api/documentApi';
@@ -124,6 +125,7 @@ export default function DocumentViewer({
   const [reportReason, setReportReason] = useState('inappropriate');
   const [reportDetails, setReportDetails] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showUnlockPrompt, setShowUnlockPrompt] = useState(false);
   const [submittingRating, setSubmittingRating] = useState(false);
 
   useEffect(() => {
@@ -516,7 +518,22 @@ export default function DocumentViewer({
       }
     } catch (err) {
       console.error('Download error:', err);
-      showToast(err.message || 'Failed to download document', 'error');
+      const status = err?.response?.status ?? err?.status;
+      const message =
+        err?.response?.data?.message ?? err?.data?.message ?? err?.message;
+      const normalizedMessage = String(message || '').toLowerCase();
+
+      if (
+        status === 403 &&
+        (normalizedMessage.includes('upload') ||
+          normalizedMessage.includes('subscribe') ||
+          normalizedMessage.includes('credit') ||
+          normalizedMessage.includes('subscription'))
+      ) {
+        setShowUnlockPrompt(true);
+      } else {
+        showToast(message || 'Failed to download document', 'error');
+      }
     } finally {
       setDownloading(false);
     }
@@ -1159,12 +1176,11 @@ export default function DocumentViewer({
                     <span className="material-symbols-outlined text-sm">
                       verified
                     </span>
-                    Unlocked via{' '}
                     {docData.unlockedVia === 'institutional'
-                      ? 'Institutional Access'
+                      ? 'Free to view (cps.edu.np) · Upload a document to download'
                       : docData.unlockedVia === 'subscription'
-                        ? 'Subscription'
-                        : 'Upload Credit'}
+                        ? 'Unlocked via Subscription'
+                        : 'Unlocked via Upload Credit'}
                   </span>
                 </div>
               )}
@@ -1384,6 +1400,41 @@ export default function DocumentViewer({
                 </>
               )}
             </div>
+
+            {showUnlockPrompt && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-surface rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <UploadCloud className="w-6 h-6 text-primary" />
+                    <h3 className="text-lg font-semibold">Unlock This Download</h3>
+                  </div>
+                  <p className="text-on-surface-variant mb-5">
+                    Upload 3 documents to earn a free download credit, or
+                    subscribe for unlimited downloads.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => navigate('/my-upload')}
+                      className="w-full py-2.5 rounded-full bg-primary text-on-primary font-semibold hover:opacity-90"
+                    >
+                      Upload a Document
+                    </button>
+                    <button
+                      onClick={() => navigate('/pricing')}
+                      className="w-full py-2.5 rounded-full border border-outline-variant font-semibold hover:bg-surface-container"
+                    >
+                      View Subscription Plans
+                    </button>
+                    <button
+                      onClick={() => setShowUnlockPrompt(false)}
+                      className="w-full py-2 text-on-surface-variant text-sm hover:underline"
+                    >
+                      Maybe later
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Related Resources Panel */}
             <div className="space-y-4">

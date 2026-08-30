@@ -25,6 +25,20 @@ export default function DocumentPreview({ fileUrl }) {
     setScale(1.0);
     setLoading(true);
     setError(null);
+
+    const timer = window.setTimeout(() => {
+      setLoading((current) => {
+        if (current) {
+          setError('Document preview is taking too long to load.');
+          return false;
+        }
+        return current;
+      });
+    }, 15000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [fileUrl]);
 
   const onDocumentLoadSuccess = useCallback(({ numPages: loadedNumPages }) => {

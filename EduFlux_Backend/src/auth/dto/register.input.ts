@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { LoginInput } from './login.input';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { UserType } from 'src/user/enum';
 
 export class RegisterInput extends LoginInput {
@@ -21,16 +21,6 @@ export class RegisterInput extends LoginInput {
   @IsString()
   @IsOptional()
   lastName?: string;
-
-  @ApiProperty({
-    description: 'Indicates whether the user is an institutional user',
-    type: Boolean,
-    example: false,
-    required: false,
-  })
-  @IsBoolean()
-  @IsOptional()
-  isInstitutional?: boolean = false;
 
   @ApiProperty({
     description: 'Type of the user',

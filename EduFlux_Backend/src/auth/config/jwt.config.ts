@@ -6,10 +6,11 @@ export class JwtConfigService {
   constructor(private configService: ConfigService) {}
 
   getAccessTokenSecret(): string {
-    return (
-      this.configService.get<string>('ACCESS_TOKEN_SECRET') ||
-      'default-access-secret'
-    );
+    const secret = this.configService.get<string>('ACCESS_TOKEN_SECRET');
+    if (!secret) {
+      throw new Error('ACCESS_TOKEN_SECRET is not defined');
+    }
+    return secret;
   }
 
   getAccessTokenExpiresIn(): string {
@@ -17,10 +18,11 @@ export class JwtConfigService {
   }
 
   getRefreshTokenSecret(): string {
-    return (
-      this.configService.get<string>('REFRESH_TOKEN_SECRET') ||
-      'default-refresh-secret'
-    );
+    const secret = this.configService.get<string>('REFRESH_TOKEN_SECRET');
+    if (!secret) {
+      throw new Error('REFRESH_TOKEN_SECRET is not defined');
+    }
+    return secret;
   }
 
   getRefreshTokenExpiresIn(): string {
