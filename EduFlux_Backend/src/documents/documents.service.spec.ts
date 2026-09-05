@@ -122,4 +122,29 @@ describe('DocumentsService', () => {
     expect(result.total).toBe(1);
     expect(mockFileUploadService.getThumbnailUrl).not.toHaveBeenCalled();
   });
+
+  it('findPublic should fall back to regex search when the Mongo text index is missing', async () => {
+    mongoCollection.find
+      .mockRejectedValueOnce({ code: 27, errmsg: 'text index required for $text query' })
+      .mockResolvedValueOnce([
+        {
+          _id: 'doc-1',
+          title: 'Math notes',
+          status: 'approved',
+          description: 'Study guide',
+          userId: '507f1f77bcf86cd799439011',
+          thumbnailUrl: 'https://stored.example/thumb.jpg',
+        },
+      ]);
+    mongoCollection.count
+      .mockRejectedValueOnce({ code: 27, errmsg: 'text index required for $text query' })
+      .mockResolvedValueOnce(1);
+
+    const result = await service.findPublic({ search: 'math', page: 1, limit: 10 });
+
+    expect(result.data).toHaveLength(1);
+    expect(result.total).toBe(1);
+    expect(mongoCollection.find).toHaveBeenCalledTimes(2);
+    expect(mongoCollection.count).toHaveBeenCalledTimes(2);
+  });
 });

@@ -102,6 +102,21 @@ export class DocumentsService {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  private buildRegexSearchQuery(searchTerm: string) {
+    const regex = new RegExp(this.escapeRegex(searchTerm), 'i');
+
+    return {
+      $or: [
+        { title: regex },
+        { subject: regex },
+        { tags: regex },
+        { description: regex },
+      ],
+    };
+  }
+
+  private textIndexReady = false;
+
   async ensureDocumentSearchIndex() {
     const connection = this.documentRepository.manager.connection as any;
     const collection = connection?.db?.collection('documents');
@@ -110,25 +125,34 @@ export class DocumentsService {
       return;
     }
 
-    await collection.createIndex(
-      {
-        title: 'text',
-        description: 'text',
-        subject: 'text',
-        category: 'text',
-        tags: 'text',
-      },
-      {
-        weights: {
-          title: 10,
-          tags: 5,
-          subject: 3,
-          category: 3,
-          description: 1,
+    try {
+      await collection.createIndex(
+        {
+          title: 'text',
+          description: 'text',
+          subject: 'text',
+          category: 'text',
+          tags: 'text',
         },
-        name: 'document_search_index',
-      },
-    );
+        {
+          weights: {
+            title: 10,
+            tags: 5,
+            subject: 3,
+            category: 3,
+            description: 1,
+          },
+          name: 'document_search_index',
+        },
+      );
+      this.textIndexReady = true;
+    } catch (error) {
+      console.warn(
+        'Could not create text search index — falling back to regex search:',
+        error,
+      );
+      this.textIndexReady = false;
+    }
   }
 
   // ─── GET ALL (filter + pagination) ────────────────────
@@ -160,22 +184,13 @@ export class DocumentsService {
     }
 
     const trimmedSearch = search?.trim();
-    let sortOptions: any = {
+    const sortOptions: any = {
       [sortBy]: sortOrder?.toLowerCase() === 'asc' ? 1 : -1,
     };
 
     if (trimmedSearch) {
-      if (trimmedSearch.length < 2) {
-        query.$or = [
-          { title: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { subject: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { tags: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { description: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-        ];
-      } else {
-        query.$text = { $search: trimmedSearch };
-        sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
-      }
+      const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+      query.$or = regexQuery.$or;
     }
 
     const skip = (page - 1) * limit;
@@ -184,7 +199,10 @@ export class DocumentsService {
       .getMongoRepository(DocumentEntity)
       .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
 
-    const [rawDocs, total] = await Promise.all([
+    let rawDocs: any[];
+    let total: number;
+
+    [rawDocs, total] = await Promise.all([
       collection.find({
         where: query,
         order: sortOptions,
@@ -276,22 +294,13 @@ export class DocumentsService {
     if (subject) query.subject = new RegExp(this.escapeRegex(subject), 'i');
 
     const trimmedSearch = search?.trim();
-    let sortOptions: any = {
+    const sortOptions: any = {
       [sortBy]: sortOrder?.toLowerCase() === 'asc' ? 1 : -1,
     };
 
     if (trimmedSearch) {
-      if (trimmedSearch.length < 2) {
-        query.$or = [
-          { title: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { subject: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { tags: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-          { description: new RegExp(this.escapeRegex(trimmedSearch), 'i') },
-        ];
-      } else {
-        query.$text = { $search: trimmedSearch };
-        sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
-      }
+      const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+      query.$or = regexQuery.$or;
     }
 
     const skip = (page - 1) * limit;
@@ -300,7 +309,10 @@ export class DocumentsService {
       .getMongoRepository(DocumentEntity)
       .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
 
-    const [rawDocs, total] = await Promise.all([
+    let rawDocs: any[];
+    let total: number;
+
+    [rawDocs, total] = await Promise.all([
       collection.find({
         where: query,
         order: sortOptions,
