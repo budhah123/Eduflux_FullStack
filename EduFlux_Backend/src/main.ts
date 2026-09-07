@@ -33,6 +33,7 @@ async function bootstrap() {
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
     'https://eduflux-full-stack.vercel.app',
+    'https://eduflux-fullstack.onrender.com',
   ]);
 
   const isAllowedOrigin = (origin?: string) => {
