@@ -479,7 +479,7 @@ export class DocumentsService {
     id: string,
     dto: UpdateDocumentInput,
     userId: string,
-    file?: { buffer: Buffer; originalname: string; size: number },
+    file?: { buffer: Buffer; originalname: string; mimetype?: string; size: number },
   ): Promise<DocumentEntity> {
     const doc = await this.findById(id);
 
@@ -500,6 +500,7 @@ export class DocumentsService {
           file.buffer,
           file.originalname,
           userId,
+          file.mimetype,
         );
 
       const thumbnailUrl =
@@ -524,6 +525,8 @@ export class DocumentsService {
         fileKey,
         fileUrl,
         fileFormat,
+        originalFileName: file.originalname,
+        contentType: file.mimetype,
         resourceType,
         fileVersion: version,
         fileSize: file.size,
@@ -539,7 +542,7 @@ export class DocumentsService {
   async adminUpdate(
     id: string,
     dto: UpdateDocumentInput,
-    file?: { buffer: Buffer; originalname: string; size: number },
+    file?: { buffer: Buffer; originalname: string; mimetype?: string; size: number },
   ): Promise<DocumentEntity> {
     const doc = await this.findById(id);
 
@@ -555,6 +558,7 @@ export class DocumentsService {
           file.buffer,
           file.originalname,
           String(doc.userId),
+          file.mimetype,
         );
 
       const thumbnailUrl =
@@ -579,6 +583,8 @@ export class DocumentsService {
         fileKey,
         fileUrl,
         fileFormat,
+        originalFileName: file.originalname,
+        contentType: file.mimetype,
         resourceType,
         fileVersion: version,
         fileSize: file.size,

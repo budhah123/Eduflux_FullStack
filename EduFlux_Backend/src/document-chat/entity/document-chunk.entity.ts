@@ -30,17 +30,38 @@ export class DocumentChunkEntity extends CommonAttribute {
   content: string;
 
   @ApiProperty({
-    description: 'Order/index of this chunk within the document',
-    type: Number,
-    example: 0,
-  })
-  @Column('int', { name: 'chunkIndex' })
-  chunkIndex: number;
-
-  @ApiProperty({
     description: 'Embedding vector representing this chunk semantically',
     type: [Number],
   })
   @Column('json', { name: 'embedding', nullable: true })
   embedding: number[];
+
+  @Column('int', { name: 'chunkIndex' })
+  chunkIndex: number;
+
+  @ApiProperty({
+    description:
+      'Nearest preceding section heading detected for this chunk, used to anchor retrieval context',
+    type: String,
+    required: false,
+  })
+  @Column('varchar', { name: 'sectionHeading', nullable: true })
+  sectionHeading?: string;
+
+  @ApiProperty({
+    description:
+      'Embedding vector of just the sectionHeading text, used to semantically match a question against ANY heading wording, not a fixed word list',
+    type: [Number],
+    required: false,
+  })
+  @Column('json', { name: 'headingEmbedding', nullable: true })
+  headingEmbedding?: number[];
+
+  @ApiProperty({
+    description:
+      'Version of the chunking algorithm used to produce this chunk, used to detect and invalidate stale chunks after a chunking-logic upgrade',
+    type: Number,
+  })
+  @Column('int', { name: 'chunkVersion', default: 1 })
+  chunkVersion: number;
 }

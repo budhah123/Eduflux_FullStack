@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { UploadCloud } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { decodeTokenPayload, getAccessToken } from '../utils/auth';
 import { documentApi } from '../services/api/documentApi';
+import { downloadFile } from '../utils/downloadFile';
 import { bookmarkApi } from '../services/api/bookmarkApi';
 import BookmarkButton from '../components/BookmarkButton';
 import { useViewDocument } from '../hooks/useViewDocument';
@@ -87,6 +88,7 @@ export default function DocumentViewer({
   const routeParams = useParams();
   const id = customId || routeParams.id || '1';
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { previewDocument } = useViewDocument(showToast);
 
@@ -105,6 +107,54 @@ export default function DocumentViewer({
   );
   const [initiatingPayment, setInitiatingPayment] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('khalti');
+
+  const fetchUploadProgress = async () => {
+    if (!getAccessToken()) return null;
+    try {
+      const res = await documentApi.getUploadProgress();
+      if (res) {
+        setUploadProgress(res);
+      }
+      return res;
+    } catch (err) {
+      console.warn('Error fetching upload progress in DocumentViewer:', err);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    fetchUploadProgress();
+  }, [id]);
+
+  useEffect(() => {
+    const shouldOpenModal =
+      location.state?.openDownloadModal ||
+      sessionStorage.getItem('pending_return_open_modal') === 'true';
+    const pendingDocId =
+      location.state?.documentId ||
+      sessionStorage.getItem('pending_return_doc_id');
+
+    if (
+      shouldOpenModal &&
+      (!pendingDocId || String(pendingDocId) === String(id))
+    ) {
+      sessionStorage.removeItem('pending_return_open_modal');
+      sessionStorage.removeItem('pending_return_doc_id');
+
+      fetchUploadProgress().then((latest) => {
+        setShowUnlockPrompt(true);
+        if (
+          location.state?.justCompletedUploads ||
+          (latest && latest.unlockCredits > 0)
+        ) {
+          showToast(
+            '3 uploads completed! Your download credit is ready.',
+            'success',
+          );
+        }
+      });
+    }
+  }, [id, location.state]);
 
   // Document Preview States
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -335,7 +385,13 @@ export default function DocumentViewer({
           const res = await documentApi.getPreviewUrl(id);
           if (res?.url) {
             const response = await fetch(res.url);
+            if (!response.ok) {
+              throw new Error(`Failed to fetch document file (${response.status} ${response.statusText})`);
+            }
             const arrayBuffer = await response.arrayBuffer();
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+              throw new Error('Document file is empty or could not be loaded.');
+            }
             const { value } = await mammoth.convertToHtml({ arrayBuffer });
             setPreviewHtml(value || '');
           }
@@ -497,7 +553,8 @@ export default function DocumentViewer({
 
   const handleDownload = async () => {
     if (isLocked) {
-      showToast('Document is locked. Please unlock to download.', 'error');
+      await fetchUploadProgress();
+      setShowUnlockPrompt(true);
       return;
     }
 
@@ -507,18 +564,12 @@ export default function DocumentViewer({
       if (res && res.url) {
         const fileExtension =
           getSafeExtension(document?.fileFormat, document?.fileUrl) || 'pdf';
-        const safeTitle = (document?.title || 'document').replace(
-          /[\\/\\:*?"<>|]/g,
-          '_',
-        );
-        const link = window.document.createElement('a');
-        link.href = res.url;
-        link.setAttribute('download', `${safeTitle}.${fileExtension}`);
-        link.setAttribute('target', '_blank');
-        window.document.body.appendChild(link);
-        link.click();
-        link.remove();
+        const filename =
+          res.filename || document?.originalFileName || `${document?.title || 'document'}.${fileExtension}`;
+        await downloadFile(res.url, filename, res.contentType);
         showToast('Download started successfully', 'success');
+        setShowUnlockPrompt(false);
+        fetchUploadProgress();
       } else {
         throw new Error('Download URL not found.');
       }
@@ -536,6 +587,7 @@ export default function DocumentViewer({
           normalizedMessage.includes('credit') ||
           normalizedMessage.includes('subscription'))
       ) {
+        await fetchUploadProgress();
         setShowUnlockPrompt(true);
       } else {
         showToast(message || 'Failed to download document', 'error');
@@ -1193,7 +1245,19 @@ export default function DocumentViewer({
               {/* Unlocked Status Badge / Unlocked Reason */}
               {!isLocked && docData.unlockedVia && (
                 <div className="mb-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold">
+                  <span
+                    onClick={() => {
+                      if (docData.unlockedVia === 'institutional') {
+                        fetchUploadProgress();
+                        setShowUnlockPrompt(true);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold ${
+                      docData.unlockedVia === 'institutional'
+                        ? 'cursor-pointer hover:bg-emerald-100 transition-colors'
+                        : ''
+                    }`}
+                  >
                     <span className="material-symbols-outlined text-sm">
                       verified
                     </span>
@@ -1422,42 +1486,137 @@ export default function DocumentViewer({
               )}
             </div>
 
-            {showUnlockPrompt && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-surface rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
-                  <div className="flex items-center gap-2 mb-3">
-                    <UploadCloud className="w-6 h-6 text-primary" />
-                    <h3 className="text-lg font-semibold">
-                      Unlock This Download
-                    </h3>
-                  </div>
-                  <p className="text-on-surface-variant mb-5">
-                    Upload 3 documents to earn a free download credit, or
-                    subscribe for unlimited downloads.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => navigate('/my-upload')}
-                      className="w-full py-2.5 rounded-full bg-primary text-on-primary font-semibold hover:opacity-90"
-                    >
-                      Upload a Document
-                    </button>
-                    <button
-                      onClick={() => navigate('/pricing')}
-                      className="w-full py-2.5 rounded-full border border-outline-variant font-semibold hover:bg-surface-container"
-                    >
-                      View Subscription Plans
-                    </button>
+            {showUnlockPrompt && (() => {
+              const currentCycleUploads =
+                uploadProgress?.progressInCurrentCycle ??
+                (uploadProgress?.approvedUploadCount
+                  ? uploadProgress.approvedUploadCount % 3
+                  : 0);
+              const hasCredits = (uploadProgress?.unlockCredits > 0);
+              const needed =
+                uploadProgress?.uploadsUntilNextCredit ??
+                Math.max(0, 3 - currentCycleUploads);
+              const progressPct = hasCredits
+                ? 100
+                : Math.min(100, Math.round((currentCycleUploads / 3) * 100));
+
+              return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                  <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-outline-variant relative text-left">
+                    {/* Close button */}
                     <button
                       onClick={() => setShowUnlockPrompt(false)}
-                      className="w-full py-2 text-on-surface-variant text-sm hover:underline"
+                      className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                      aria-label="Close modal"
                     >
-                      Maybe later
+                      <span className="material-symbols-outlined text-lg">close</span>
                     </button>
+
+                    {/* Header */}
+                    <div className="mb-6 pr-8">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-2">
+                        <span className="material-symbols-outlined text-sm">school</span>
+                        <span>Techspire Institutional Access (cps.edu.np)</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-[#1E293B]">
+                        Unlock Document Download
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Viewing this academic resource is free with your Techspire student account. To download and save the file, complete 3 document uploads to earn a free download credit, or choose a subscription plan.
+                      </p>
+                    </div>
+
+                    {/* Upload Document Subscription / Unlock Plan Card (Prominently displayed) */}
+                    <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-indigo-50/70 to-purple-50/50 p-5 mb-5 relative shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-base">cloud_upload</span>
+                          Upload to Unlock (Free Plan)
+                        </span>
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-primary text-white">
+                          {hasCredits
+                            ? '1 Credit Ready'
+                            : `${currentCycleUploads} / 3 Uploaded`}
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mb-3">
+                        <div
+                          className="bg-gradient-to-r from-primary to-secondary h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+
+                      {hasCredits ? (
+                        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 mb-4 bg-emerald-100/70 p-3 rounded-xl border border-emerald-200">
+                          <span className="text-base">🎉</span>
+                          <span>
+                            You have <strong>{uploadProgress.unlockCredits}</strong> download credit ready! Click below to download this document immediately.
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-600 mb-4">
+                          💡 Upload <strong>{needed}</strong> more study material or assignment to earn 1 free download credit for this document.
+                        </p>
+                      )}
+
+                      {/* Action Button */}
+                      {hasCredits ? (
+                        <button
+                          onClick={async () => {
+                            await handleDownload();
+                          }}
+                          disabled={downloading}
+                          className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                        >
+                          <span className="material-symbols-outlined text-lg">download</span>
+                          <span>{downloading ? 'Downloading...' : 'Download Document Now'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            sessionStorage.setItem('pending_return_doc_id', id);
+                            sessionStorage.setItem('pending_return_open_modal', 'true');
+                            navigate('/upload-to-unlock', {
+                              state: {
+                                returnTo: `/documents/${id}/view`,
+                                documentId: id,
+                                openDownloadModal: true,
+                                uploadsNeeded: needed,
+                              },
+                            });
+                          }}
+                          className="w-full py-3 px-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-md hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                        >
+                          <span className="material-symbols-outlined text-lg">cloud_upload</span>
+                          <span>Upload Documents to Unlock (Free)</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Alternative Subscription Option */}
+                    <div className="pt-2 border-t border-slate-200 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-600">Want instant downloads without uploading?</span>
+                        <span className="text-xs font-bold text-slate-800">From NPR 499/mo</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          sessionStorage.setItem('pending_return_doc_id', id);
+                          navigate(`/pricing?documentId=${id}`);
+                        }}
+                        className="w-full py-2.5 rounded-xl border border-slate-300 hover:border-primary text-slate-700 hover:text-primary font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">workspace_premium</span>
+                        <span>View Subscription Plans (eSewa / Khalti)</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
 
             {/* Related Resources Panel */}
             <div className="space-y-4">

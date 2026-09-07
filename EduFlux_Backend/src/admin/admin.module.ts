@@ -6,6 +6,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { AdminUserController } from './user/admin-user.controller';
 import { AdminAuthController } from './auth/admin-auth.controller';
 import { AdminDocumentController } from './document/admin-document.controller';
+import { AdminDashboardController } from './admin-dashboard.controller';
 import { DocumentsModule } from 'src/documents/documents.module';
 import { FileUploadModule } from '@app/file-upload';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -30,6 +31,7 @@ import { MailModule } from '@app/mail';
     MailModule,
   ],
   controllers: [
+    AdminDashboardController,
     AdminUserController,
     AdminAuthController,
     AdminDocumentController,

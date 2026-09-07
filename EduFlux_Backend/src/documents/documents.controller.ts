@@ -54,7 +54,14 @@ const isAllowedUploadMimeType = (mimeType: string) =>
 type UploadedDocumentFile = {
   buffer: Buffer;
   originalname: string;
+  mimetype: string;
   size: number;
+};
+
+const MIME_TYPES_BY_FORMAT: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
 @ApiTags('Documents')
@@ -129,7 +136,7 @@ export class DocumentsController {
       }
     }
 
-    const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
+    const format = (doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf').toLowerCase();
     if (!doc.resourceType) {
       throw new InternalServerErrorException(
         `Document ${doc._id} is missing resourceType — run fix-resource-types.ts`,
@@ -165,7 +172,7 @@ export class DocumentsController {
       }
     }
 
-    const format = doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf';
+    const format = (doc.fileFormat || doc.fileUrl.split('.').pop() || 'pdf').toLowerCase();
     if (!doc.resourceType) {
       throw new InternalServerErrorException(
         `Document ${doc._id} is missing resourceType — run fix-resource-types.ts`,
@@ -177,8 +184,14 @@ export class DocumentsController {
       format,
       doc.resourceType,
       doc.fileVersion,
+      doc.originalFileName || `${doc.title || 'document'}.${format}`,
     );
-    return { url: signedUrl };
+    return {
+      url: signedUrl,
+      filename: doc.originalFileName || `${doc.title || 'document'}.${format}`,
+      contentType:
+        doc.contentType || MIME_TYPES_BY_FORMAT[format] || 'application/octet-stream',
+    };
   }
 
   // PROTECTED now — needed so req.user available for isLocked check
@@ -241,12 +254,15 @@ export class DocumentsController {
         file.buffer,
         file.originalname,
         req.user._id,
+        file.mimetype,
       );
     return this.documentsService.create({
       ...body,
       fileKey,
       fileUrl,
       fileFormat,
+      originalFileName: file.originalname,
+      contentType: file.mimetype,
       resourceType,
       fileVersion: version,
       fileSize: file.size,

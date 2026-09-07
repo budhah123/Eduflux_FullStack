@@ -87,6 +87,22 @@ export class DocumentEntity extends CommonAttribute {
   fileFormat?: string;
 
   @ApiProperty({
+    description: 'Original filename supplied during upload',
+    type: String,
+    required: false,
+  })
+  @Column('string', { name: 'originalFileName', nullable: true })
+  originalFileName?: string;
+
+  @ApiProperty({
+    description: 'MIME type supplied during upload',
+    type: String,
+    required: false,
+  })
+  @Column('string', { name: 'contentType', nullable: true })
+  contentType?: string;
+
+  @ApiProperty({
     description: 'File size of the document',
     type: Number,
     example: 1024,

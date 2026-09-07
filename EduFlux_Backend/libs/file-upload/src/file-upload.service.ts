@@ -11,8 +11,20 @@ type UploadResult = {
   fileUrl: string;
   fileFormat: string;
   resourceType: string;
-  contentType?: string;
+  contentType: string;
   version?: string;
+};
+
+const MIME_TYPES_BY_FORMAT: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  rtf: 'application/rtf',
+  txt: 'text/plain',
 };
 
 @Injectable()
@@ -32,8 +44,10 @@ export class FileUploadService {
     fileBuffer: Buffer,
     fileName: string,
     userId: string,
+    mimeType?: string,
   ): Promise<UploadResult> {
     const ext = path.extname(fileName);
+    const format = ext.replace(/^\./, '').toLowerCase();
     const nameWithoutExt = fileName.replace(ext, '').replace(/\s+/g, '_');
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -54,9 +68,9 @@ export class FileUploadService {
           resolve({
             fileKey: result.public_id,
             fileUrl: result.secure_url,
-            fileFormat: result.format || ext.replace(/^\./, ''),
+            fileFormat: result.format || format,
             resourceType: result.resource_type,
-            contentType: result.resource_type,
+            contentType: mimeType || MIME_TYPES_BY_FORMAT[format] || 'application/octet-stream',
             version: result.version ? String(result.version) : undefined,
           });
         },
@@ -93,18 +107,32 @@ export class FileUploadService {
     format: string,
     resourceType: string = 'raw',
     version?: string,
+    filename?: string,
   ): Promise<string> {
     try {
-      const escapedFormat = format.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const trailingExtPattern = new RegExp(`\\.${escapedFormat}$`, 'i');
-      const cleanPublicId = trailingExtPattern.test(fileKey)
-        ? fileKey.replace(trailingExtPattern, '')
-        : fileKey;
+      const isRaw = resourceType === 'raw';
+
+      // For raw resources in Cloudinary, fileKey is the exact public_id.
+      // Cloudinary does not perform dynamic format transformations on raw assets;
+      // passing `format` appends an unwanted extension to the URL path which breaks
+      // the lookup with a 404.
+      // For image resources (e.g. PDF rendered as images), Cloudinary requires format.
+      let cleanPublicId = fileKey;
+      let targetFormat: string | undefined = undefined;
+
+      if (!isRaw) {
+        const escapedFormat = format.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const trailingExtPattern = new RegExp(`\\.${escapedFormat}$`, 'i');
+        cleanPublicId = trailingExtPattern.test(fileKey)
+          ? fileKey.replace(trailingExtPattern, '')
+          : fileKey;
+        targetFormat = format.toLowerCase();
+      }
 
       const signedUrl = cloudinary.url(cleanPublicId, {
         resource_type: resourceType,
         type: 'upload',
-        format: resourceType === 'raw' ? undefined : format,
+        format: targetFormat,
         version: version ? Number(version) : undefined,
         secure: true,
       });

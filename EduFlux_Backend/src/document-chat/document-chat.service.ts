@@ -12,6 +12,7 @@ import { EmbeddingService } from './embedding.service';
 
 @Injectable()
 export class DocumentChatService {
+  private static readonly CHUNK_VERSION = 3;
   constructor(
     @InjectRepository(DocumentChunkEntity)
     private chunkRepo: MongoRepository<DocumentChunkEntity>,
@@ -28,10 +29,17 @@ export class DocumentChatService {
 
   async processDocument(documentId: string) {
     const existing = await this.chunkRepo.find({ where: { documentId } });
-    if (existing.length > 0) {
+    const isCurrentVersion =
+      existing.length > 0 &&
+      existing.every(
+        (c) => c.chunkVersion === DocumentChatService.CHUNK_VERSION,
+      );
+    if (isCurrentVersion) {
       return;
     }
-
+    if (existing.length > 0) {
+      await this.chunkRepo.remove(existing);
+    }
     const doc = await this.docRepo.findOne({
       where: { _id: new ObjectId(documentId) },
     });
@@ -44,16 +52,36 @@ export class DocumentChatService {
 
     const text = await this.textExtraction.extractText(buffer, doc.fileFormat);
 
-    const chunks = this.textExtraction.chunkText(text);
+    const chunks = this.textExtraction.chunkText(text); // [{ content, sectionHeading }]
 
-    const embeddings = await this.embeddingService.embed(chunks);
+    const contentEmbeddings = await this.embeddingService.embed(
+      chunks.map((c) => c.content),
+    );
 
-    const chunkEntities = chunks.map((content, index) =>
+    const uniqueHeadings = Array.from(
+      new Set(
+        chunks.map((c) => c.sectionHeading).filter((h): h is string => !!h),
+      ),
+    );
+    const headingEmbeddingsList =
+      uniqueHeadings.length > 0
+        ? await this.embeddingService.embed(uniqueHeadings)
+        : [];
+    const headingEmbeddingMap = new Map(
+      uniqueHeadings.map((h, i) => [h, headingEmbeddingsList[i]]),
+    );
+
+    const chunkEntities = chunks.map((chunk, index) =>
       this.chunkRepo.create({
         documentId,
-        content,
+        content: chunk.content,
+        sectionHeading: chunk.sectionHeading ?? undefined,
+        headingEmbedding: chunk.sectionHeading
+          ? headingEmbeddingMap.get(chunk.sectionHeading)
+          : undefined,
         chunkIndex: index,
-        embedding: embeddings[index],
+        embedding: contentEmbeddings[index],
+        chunkVersion: DocumentChatService.CHUNK_VERSION,
       }),
     );
 
@@ -70,20 +98,39 @@ export class DocumentChatService {
 
     const [questionEmbedding] = await this.embeddingService.embed([question]);
 
-    const scored = allChunks.map((chunk) => ({
-      chunk,
-      score: this.embeddingService.cosineSimilarity(
+    const headingScore = (chunk: DocumentChunkEntity): number => {
+      if (!chunk.headingEmbedding) return 0;
+      return this.embeddingService.cosineSimilarity(
+        questionEmbedding,
+        chunk.headingEmbedding,
+      );
+    };
+
+    const scored = allChunks.map((chunk) => {
+      const contentScore = this.embeddingService.cosineSimilarity(
         questionEmbedding,
         chunk.embedding,
-      ),
-    }));
+      );
+      const hScore = headingScore(chunk);
+      return { chunk, score: Math.max(contentScore, hScore) };
+    });
 
-    const topChunks = scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
-      .map((s) => s.chunk.content);
+    const ranked = scored.sort((a, b) => b.score - a.score);
+    const topMatches = ranked.slice(0, 6);
 
-    const context = topChunks.join('\n\n---\n\n');
+    const chunksByIndex = new Map(allChunks.map((c) => [c.chunkIndex, c]));
+    const contextChunks = new Map<string, string>();
+    for (const match of topMatches) {
+      contextChunks.set(match.chunk._id.toString(), match.chunk.content);
+    }
+    for (const match of topMatches.slice(0, 2)) {
+      const prev = chunksByIndex.get(match.chunk.chunkIndex - 1);
+      const next = chunksByIndex.get(match.chunk.chunkIndex + 1);
+      if (prev) contextChunks.set(prev._id.toString(), prev.content);
+      if (next) contextChunks.set(next._id.toString(), next.content);
+    }
+
+    const context = Array.from(contextChunks.values()).join('\n\n---\n\n');
 
     const groq = this.getGroqClient();
     if (!groq) {
@@ -95,7 +142,11 @@ export class DocumentChatService {
       messages: [
         {
           role: 'user',
-          content: `You are an academic assistant. Answer the question based ONLY on the following excerpts from the document. If the answer isn't covered in these excerpts, say so honestly.
+          content: `You are an academic assistant. Answer the question based ONLY on the following excerpts from the document.
+
+The document may label its sections differently from how the question phrases them, and capitalization should never matter (e.g. "ABSTRACT" and "abstract" are the same thing). Reason about the underlying meaning of the question and match it to whichever section or passage is semantically about that topic, even if the exact words differ. Do not claim information is missing just because the precise wording or heading differs from the question.
+
+If, after genuinely considering semantic equivalents, the answer truly isn't covered in these excerpts, say so honestly rather than guessing.
 
 Document excerpts:
 ${context}

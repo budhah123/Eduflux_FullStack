@@ -1,10 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import NotificationBell from '../components/NotificationBell';
+import { decodeTokenPayload, getAccessToken } from '../utils/auth';
+import { documentApi } from '../services/api/documentApi';
 
 export default function AdminLayout() {
   const location = useLocation();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [adminUser, setAdminUser] = useState(() => {
+    const payload = decodeTokenPayload(getAccessToken());
+    return {
+      name: payload?.email ? payload.email.split('@')[0] : 'Administrator',
+      email: payload?.email || '',
+      role: payload?.role || payload?.userType || 'System Administrator',
+      avatar: null,
+    };
+  });
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const user = await documentApi.getCurrentUser();
+        if (user) {
+          const fullName = [user.firstName, user.lastName]
+            .filter(Boolean)
+            .join(' ');
+          setAdminUser({
+            name: fullName || user.email?.split('@')[0] || 'Administrator',
+            email: user.email || '',
+            role: user.role || user.userType || 'System Administrator',
+            avatar: user.avatarUrl || user.profilePicture,
+          });
+        }
+      } catch {
+        // Fallback to token decoded data
+      }
+    };
+    loadProfile();
+  }, []);
 
   const navItems = [
     {
@@ -24,23 +57,6 @@ export default function AdminLayout() {
     },
   ];
 
-  const externalLinks = [
-    {
-      name: 'Browse Hub',
-      path: '/browse-panel',
-      icon: 'search',
-    },
-    {
-      name: 'My Uploads',
-      path: '/my-upload',
-      icon: 'upload_file',
-    },
-    {
-      name: 'AI Chat',
-      path: '/dashboard',
-      icon: 'auto_awesome',
-    },
-  ];
 
   const isActive = (path) => location.pathname === path;
 
@@ -69,29 +85,24 @@ export default function AdminLayout() {
             </Link>
           ))}
 
-          <div className="text-[10px] uppercase font-bold text-slate-400 px-4 mt-6 mb-2 tracking-wider">Student View</div>
-          {externalLinks.map((item) => (
-            <Link
-              key={item.name}
-              to={item.path}
-              className="flex items-center px-4 py-3 gap-3 rounded-lg text-slate-600 hover:bg-[#f3f4f5] hover:text-[#1E293B] transition-all text-sm"
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.name}</span>
-            </Link>
-          ))}
         </nav>
 
         <div className="mt-auto border-t border-slate-200 pt-6 px-4">
           <div className="flex items-center gap-3">
-            <img
-              alt="User Profile Avatar"
-              className="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-[#4f46e5]/30"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDGYbLamcjsQELAQXoyV_Lx8wbCveR0kRMNb92TDmDh0xS0MYB4uxJAxStfj9pHI3Qtd4vI5TRrBIbjkv9ilftsdINYSZWMvzYoTMnWoYpMKs3fKE51u_snROddEuh_7tHRE62SbKlqabo6NY5svDbW1-wgwnQdYcd5EzI-FSMqjljj0e9zxRWRw-PbzcH3UXr8xd5Ij3lstC-j3hFnyqGmtYIcpY22j7n3r2kPBmATeYEyYnnxqyz_8c81H2z1HjG-WhAScWKfX20"
-            />
-            <div>
-              <p className="text-sm font-bold block text-[#1E293B]">Academic User</p>
-              <p className="text-xs text-slate-500">Administrator</p>
+            {adminUser.avatar ? (
+              <img
+                alt="User Profile Avatar"
+                className="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-[#4f46e5]/30"
+                src={adminUser.avatar}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#4f46e5] text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-[#4f46e5]/30 uppercase">
+                {adminUser.name.slice(0, 2)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold block text-[#1E293B] truncate">{adminUser.name}</p>
+              <p className="text-xs text-slate-500 truncate capitalize">{adminUser.role}</p>
             </div>
           </div>
         </div>
@@ -138,30 +149,24 @@ export default function AdminLayout() {
             </Link>
           ))}
 
-          <div className="text-[10px] uppercase font-bold text-slate-400 px-4 mt-6 mb-2 tracking-wider">Student View</div>
-          {externalLinks.map((item) => (
-            <Link
-              key={item.name}
-              to={item.path}
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="flex items-center px-4 py-3 gap-3 rounded-lg text-slate-600 hover:bg-[#f3f4f5] hover:text-[#1E293B] transition-all text-sm"
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.name}</span>
-            </Link>
-          ))}
         </nav>
 
         <div className="mt-auto border-t border-slate-200 pt-6 px-4">
           <div className="flex items-center gap-3">
-            <img
-              alt="User Profile Avatar"
-              className="w-10 h-10 rounded-full object-cover shadow-sm"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDGYbLamcjsQELAQXoyV_Lx8wbCveR0kRMNb92TDmDh0xS0MYB4uxJAxStfj9pHI3Qtd4vI5TRrBIbjkv9ilftsdINYSZWMvzYoTMnWoYpMKs3fKE51u_snROddEuh_7tHRE62SbKlqabo6NY5svDbW1-wgwnQdYcd5EzI-FSMqjljj0e9zxRWRw-PbzcH3UXr8xd5Ij3lstC-j3hFnyqGmtYIcpY22j7n3r2kPBmATeYEyYnnxqyz_8c81H2z1HjG-WhAScWKfX20"
-            />
-            <div>
-              <p className="text-sm font-bold block text-[#1E293B]">Academic User</p>
-              <p className="text-xs text-slate-500">Administrator</p>
+            {adminUser.avatar ? (
+              <img
+                alt="User Profile Avatar"
+                className="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-[#4f46e5]/30"
+                src={adminUser.avatar}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#4f46e5] text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-[#4f46e5]/30 uppercase">
+                {adminUser.name.slice(0, 2)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold block text-[#1E293B] truncate">{adminUser.name}</p>
+              <p className="text-xs text-slate-500 truncate capitalize">{adminUser.role}</p>
             </div>
           </div>
         </div>

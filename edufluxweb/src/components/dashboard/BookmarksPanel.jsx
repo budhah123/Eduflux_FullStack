@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bookmarkApi } from '../../services/api/bookmarkApi';
 import { documentApi } from '../../services/api/documentApi';
+import { downloadFile } from '../../utils/downloadFile';
 import BookmarkButton from '../BookmarkButton';
 
 function GridDocumentCard({ doc, onPreview, onDownload, onToggleBookmark }) {
@@ -195,13 +196,7 @@ export default function BookmarksPanel({ setActiveTab, showToast }) {
       }
       const res = await documentApi.getDownloadUrl(doc.id);
       if (res && res.url) {
-        const link = window.document.createElement('a');
-        link.href = res.url;
-        link.setAttribute('download', doc.title);
-        link.setAttribute('target', '_blank');
-        window.document.body.appendChild(link);
-        link.click();
-        link.remove();
+        await downloadFile(res.url, res.filename || doc.title, res.contentType);
       }
     } catch (err) {
       console.error('Error downloading document:', err);

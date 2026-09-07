@@ -89,4 +89,37 @@ describe('DocumentsController', () => {
     expect(result).toEqual({ url: 'https://signed.url/doc' });
     expect(uploadService.createSignedUrl).toHaveBeenCalledWith('key-123', 'pdf', 'raw', '1');
   });
+
+  it('should return the original DOCX filename and MIME type for downloads', async () => {
+    documentsService.findById.mockResolvedValue({
+      _id: 'doc-456',
+      title: 'Study notes',
+      originalFileName: 'semester-notes.docx',
+      contentType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileKey: 'key-456',
+      fileFormat: 'docx',
+      resourceType: 'raw',
+      fileVersion: '2',
+      isPremiumOnly: false,
+    });
+
+    const result = await controller.download('doc-456', {
+      user: { _id: 'user-1' },
+    } as any);
+
+    expect(result).toEqual({
+      url: 'https://signed.url/doc',
+      filename: 'semester-notes.docx',
+      contentType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    expect(uploadService.createSignedUrl).toHaveBeenCalledWith(
+      'key-456',
+      'docx',
+      'raw',
+      '2',
+      'semester-notes.docx',
+    );
+  });
 });
