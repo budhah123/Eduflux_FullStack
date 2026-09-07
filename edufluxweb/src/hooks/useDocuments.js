@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { documentApi } from '../services/api/documentApi';
+import { downloadFile } from '../utils/downloadFile';
 
 export function useDocuments(showToast) {
   const [documents, setDocuments] = useState([]);
@@ -189,7 +190,7 @@ export function useDocuments(showToast) {
     try {
       const result = await documentApi.getDownloadUrl(id);
       if (result && result.url) {
-        window.open(result.url, '_blank');
+        await downloadFile(result.url, result.filename || title, result.contentType);
         // Optimistically increment local count
         setDocuments((prev) =>
           prev.map((d) =>

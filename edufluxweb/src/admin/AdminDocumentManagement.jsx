@@ -209,7 +209,7 @@ export default function AdminDocumentManagement() {
       };
 
       if (activeTab === 'queue') {
-        filters.status = 'flagged';
+        filters.status = 'pending';
       }
 
       const response = await documentApi.adminGetDocuments(filters);
@@ -220,7 +220,7 @@ export default function AdminDocumentManagement() {
       }
 
       // Fetch dynamic badge count for moderation queue and total documents
-      const queueRes = await documentApi.adminGetDocuments({ status: 'flagged', limit: 1 });
+      const queueRes = await documentApi.adminGetDocuments({ status: 'pending', limit: 1 });
       setQueueCount(queueRes.total || 0);
 
       const totalRes = await documentApi.adminGetDocuments({ limit: 1 });

@@ -72,9 +72,26 @@ export class AdminUserController {
     type: [UserOutput],
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized - No token provided' })
-  async getUsers(@Query() paginationInput: PaginationInput) {
+  async getUsers(
+    @Query() paginationInput: PaginationInput,
+    @Query('search') search?: string,
+    @Query('userType') userType?: string,
+  ) {
+    const where: any = {};
+    if (userType && userType !== 'All') {
+      where.userType = userType;
+    }
+    if (search && search.trim()) {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      where.$or = [
+        { email: searchRegex },
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+      ];
+    }
+
     const [users, count] = await this.userService.getUsers(
-      undefined,
+      where,
       undefined,
       paginationInput,
     );
@@ -84,6 +101,7 @@ export class AdminUserController {
         total: count,
         page: paginationInput?.page || 1,
         limit: paginationInput?.limit || 10,
+        totalPages: Math.ceil(count / (paginationInput?.limit || 10)) || 1,
       },
     };
   }

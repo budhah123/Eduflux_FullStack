@@ -122,6 +122,27 @@ export const documentApi = {
     return apiClient.patch(`/admin/document/${id}/status`, { status });
   },
 
+  // GET /admin/dashboard/stats
+  adminGetDashboardStats: async () => {
+    return apiClient.get('/admin/dashboard/stats');
+  },
+
+  // GET /admin/user
+  adminGetUsers: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach((key) => {
+      if (
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ''
+      ) {
+        params.append(key, filters[key]);
+      }
+    });
+    const queryString = params.toString();
+    return apiClient.get(`/admin/user${queryString ? `?${queryString}` : ''}`);
+  },
+
   // POST /payment/initiate
   initiatePayment: async (data) => {
     return apiClient.post('/payment/initiate', data);

@@ -64,11 +64,16 @@ export default function AdminUserManagement() {
   const [invitePassword, setInvitePassword] = useState('');
   const [inviteUserType, setInviteUserType] = useState('USER');
 
-  // Fetch users from API
+  // Fetch users from API with server-side pagination, search, and role filtering
   const fetchUsers = async (page = currentPage) => {
     setLoading(true);
     try {
-      const response = await apiClient.get(`/admin/user?page=${page}&limit=${pageSize}`);
+      let url = `/admin/user?page=${page}&limit=${pageSize}`;
+      if (activeFilter === 'Faculty') url += '&userType=ADMIN';
+      if (activeFilter === 'Students') url += '&userType=USER';
+      if (searchQuery.trim()) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+
+      const response = await apiClient.get(url);
       if (response && response.data) {
         setUsers(response.data);
         if (response.meta) {
@@ -83,8 +88,11 @@ export default function AdminUserManagement() {
   };
 
   useEffect(() => {
-    fetchUsers(currentPage);
-  }, [currentPage]);
+    const timer = setTimeout(() => {
+      fetchUsers(currentPage);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentPage, activeFilter, searchQuery]);
 
   // Open user details and fetch fresh by ID
   const handleOpenDetails = async (userId) => {
@@ -222,31 +230,46 @@ export default function AdminUserManagement() {
   };
 
   const handleExportCSV = () => {
-    showToast('Exporting active user directories...');
-    setTimeout(() => {
-      showToast('CSV directory downloaded successfully!');
-    }, 1200);
+    if (!users || users.length === 0) {
+      showToast('No users to export', 'error');
+      return;
+    }
+    const headers = [
+      'First Name',
+      'Last Name',
+      'Email',
+      'Role',
+      'User Type',
+      'Status',
+      'Joined Date',
+    ];
+    const rows = users.map((u) => [
+      `"${(u.firstName || '').replace(/"/g, '""')}"`,
+      `"${(u.lastName || '').replace(/"/g, '""')}"`,
+      `"${(u.email || '').replace(/"/g, '""')}"`,
+      `"${(u.role || '').replace(/"/g, '""')}"`,
+      `"${(u.userType || 'USER').replace(/"/g, '""')}"`,
+      `"${u.isActive !== false ? 'Active' : 'Suspended'}"`,
+      `"${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}"`,
+    ]);
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `eduflux_users_${new Date().toISOString().split('T')[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('User directory CSV downloaded successfully!');
   };
 
-  // Filter & search implementation
-  const filteredUsers = users.filter((user) => {
-    // Filter tags: Faculty (ADMIN) vs Students (USER)
-    if (activeFilter === 'Faculty' && user.userType !== 'ADMIN') return false;
-    if (activeFilter === 'Students' && user.userType !== 'USER') return false;
-
-    // Search queries
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
-      return (
-        fullName.includes(query) ||
-        (user.email || '').toLowerCase().includes(query) ||
-        (user.role || '').toLowerCase().includes(query) ||
-        (user.userType || '').toLowerCase().includes(query)
-      );
-    }
-    return true;
-  });
+  // Filter & search implementation (server-side backed)
+  const filteredUsers = users;
 
   return (
     <div className="flex flex-col gap-8 font-sans text-[#1E293B]">

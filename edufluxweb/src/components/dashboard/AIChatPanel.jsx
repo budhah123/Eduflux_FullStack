@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentApi } from '../../services/api/documentApi';
+import { downloadFile } from '../../utils/downloadFile';
 
 const getFileIcon = (fileFormat, fileUrl) => {
   let format = (fileFormat || '').toLowerCase();
@@ -249,7 +250,11 @@ export default function AIChatPanel({ showToast }) {
       const downloadRes = await documentApi.getDownloadUrl(selectedDocId);
       const url = downloadRes?.url || downloadRes?.downloadUrl || selectedDoc?.fileUrl;
       if (url) {
-        window.open(url, '_blank');
+        await downloadFile(
+          url,
+          downloadRes?.filename || selectedDoc?.originalFileName || selectedDoc?.title,
+          downloadRes?.contentType,
+        );
       } else {
         if (showToast) showToast('Download link not available', 'error');
       }

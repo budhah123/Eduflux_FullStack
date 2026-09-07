@@ -60,6 +60,7 @@ const isAllowedUploadMimeType = (mimeType: string) =>
 type UploadedDocumentFile = {
   buffer: Buffer;
   originalname: string;
+  mimetype: string;
   size: number;
 };
 
@@ -111,17 +112,20 @@ export class AdminDocumentController {
     @Body() body: CreateDocumentInput,
     @Req() req,
   ) {
-    const { fileKey, fileUrl, fileFormat, resourceType, version } =
+      const { fileKey, fileUrl, fileFormat, resourceType, version } =
       await this.uploadService.uploadFile(
         file.buffer,
         file.originalname,
         req.user.id,
+          file.mimetype,
       );
     return this.documentService.create({
       ...body,
       fileKey,
       fileUrl,
       fileFormat,
+      originalFileName: file.originalname,
+      contentType: file.mimetype,
       resourceType,
       fileVersion: version,
       fileSize: file.size,
