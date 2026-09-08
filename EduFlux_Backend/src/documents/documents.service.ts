@@ -189,8 +189,12 @@ export class DocumentsService {
     };
 
     if (trimmedSearch) {
-      const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
-      query.$or = regexQuery.$or;
+      if (this.textIndexReady) {
+        query.$text = { $search: trimmedSearch };
+      } else {
+        const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+        query.$or = regexQuery.$or;
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -202,15 +206,36 @@ export class DocumentsService {
     let rawDocs: any[];
     let total: number;
 
-    [rawDocs, total] = await Promise.all([
-      collection.find({
-        where: query,
-        order: sortOptions,
-        skip,
-        take: limit,
-      }),
-      collection.count(query),
-    ]);
+    try {
+      [rawDocs, total] = await Promise.all([
+        collection.find({
+          where: query,
+          order: sortOptions,
+          skip,
+          take: limit,
+        }),
+        collection.count(query),
+      ]);
+    } catch (error: any) {
+      if (error?.code === 27 && trimmedSearch) {
+        this.textIndexReady = false;
+        delete query.$text;
+        const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+        query.$or = regexQuery.$or;
+
+        [rawDocs, total] = await Promise.all([
+          collection.find({
+            where: query,
+            order: sortOptions,
+            skip,
+            take: limit,
+          }),
+          collection.count(query),
+        ]);
+      } else {
+        throw error;
+      }
+    }
 
     const documentIds = rawDocs.map((doc) => String(doc._id));
     const ratingStats = (await this.ratingService.getAverageRatingForDocuments(
@@ -299,8 +324,12 @@ export class DocumentsService {
     };
 
     if (trimmedSearch) {
-      const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
-      query.$or = regexQuery.$or;
+      if (this.textIndexReady) {
+        query.$text = { $search: trimmedSearch };
+      } else {
+        const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+        query.$or = regexQuery.$or;
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -312,15 +341,36 @@ export class DocumentsService {
     let rawDocs: any[];
     let total: number;
 
-    [rawDocs, total] = await Promise.all([
-      collection.find({
-        where: query,
-        order: sortOptions,
-        skip,
-        take: limit,
-      }),
-      collection.count(query),
-    ]);
+    try {
+      [rawDocs, total] = await Promise.all([
+        collection.find({
+          where: query,
+          order: sortOptions,
+          skip,
+          take: limit,
+        }),
+        collection.count(query),
+      ]);
+    } catch (error: any) {
+      if (error?.code === 27 && trimmedSearch) {
+        this.textIndexReady = false;
+        delete query.$text;
+        const regexQuery = this.buildRegexSearchQuery(trimmedSearch);
+        query.$or = regexQuery.$or;
+
+        [rawDocs, total] = await Promise.all([
+          collection.find({
+            where: query,
+            order: sortOptions,
+            skip,
+            take: limit,
+          }),
+          collection.count(query),
+        ]);
+      } else {
+        throw error;
+      }
+    }
 
     const documentIds = rawDocs.map((doc) => String(doc._id));
     const ratingStats = (await this.ratingService.getAverageRatingForDocuments(
@@ -479,7 +529,12 @@ export class DocumentsService {
     id: string,
     dto: UpdateDocumentInput,
     userId: string,
-    file?: { buffer: Buffer; originalname: string; mimetype?: string; size: number },
+    file?: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype?: string;
+      size: number;
+    },
   ): Promise<DocumentEntity> {
     const doc = await this.findById(id);
 
@@ -542,7 +597,12 @@ export class DocumentsService {
   async adminUpdate(
     id: string,
     dto: UpdateDocumentInput,
-    file?: { buffer: Buffer; originalname: string; mimetype?: string; size: number },
+    file?: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype?: string;
+      size: number;
+    },
   ): Promise<DocumentEntity> {
     const doc = await this.findById(id);
 
