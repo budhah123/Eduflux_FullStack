@@ -13,6 +13,7 @@ import { CreateDocumentInput, UpdateDocumentInput } from './dto';
 import { FilterDocumentDto } from './dto/filter-document.dto';
 import { ObjectId } from 'mongodb';
 import { UserService } from '../user/user.service';
+import { UserType } from '../user/enum';
 import { DocumentStatus } from './enum';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/enum';
@@ -62,9 +63,46 @@ export class DocumentsService {
       dto.thumbnailUrl = generatedThumbnail ?? undefined;
     }
 
+    // Determine approval status:
+    // Admin uploads are automatically approved without needing a separate approval step.
+    let initialStatus = dto.status;
+    if (!initialStatus && dto.userId) {
+      try {
+        const uploader = await this.userService.getUser({
+          _id: ObjectId.isValid(dto.userId)
+            ? new ObjectId(dto.userId)
+            : dto.userId,
+        });
+        if (uploader?.userType === UserType.ADMIN) {
+          initialStatus = DocumentStatus.APPROVED;
+        }
+      } catch (err) {
+        console.warn('Could not check uploader role for auto-approval:', err);
+      }
+    }
+    if (!initialStatus) {
+      initialStatus = DocumentStatus.PENDING;
+    }
+
+    // Enforce max 4 featured documents for homepage
+    if (dto.isHomePage) {
+      const collection = this.documentRepository.manager
+        .getMongoRepository(DocumentEntity)
+        .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
+      const currentFeaturedCount = await collection.count({
+        isHomePage: true,
+      });
+      if (currentFeaturedCount >= 4) {
+        throw new BadRequestException(
+          'A maximum of 4 documents can be featured on the homepage at the same time. Please unfeature another document first.',
+        );
+      }
+    }
+
     const doc = this.documentRepository.create({
-      status: DocumentStatus.PENDING,
       ...dto,
+      status: initialStatus,
+      isHomePage: Boolean(dto.isHomePage),
     });
     const savedDoc = await this.documentRepository.save(doc);
 
@@ -181,6 +219,9 @@ export class DocumentsService {
     if (semester) query.semester = semester;
     if (subject) {
       query.subject = new RegExp(this.escapeRegex(subject), 'i');
+    }
+    if (filter.isHomePage !== undefined) {
+      query.isHomePage = filter.isHomePage;
     }
 
     const trimmedSearch = search?.trim();
@@ -317,6 +358,9 @@ export class DocumentsService {
     if (category) query.category = category;
     if (semester) query.semester = semester;
     if (subject) query.subject = new RegExp(this.escapeRegex(subject), 'i');
+    if (filter.isHomePage !== undefined) {
+      query.isHomePage = filter.isHomePage;
+    }
 
     const trimmedSearch = search?.trim();
     const sortOptions: any = {
@@ -606,6 +650,23 @@ export class DocumentsService {
   ): Promise<DocumentEntity> {
     const doc = await this.findById(id);
 
+    if (dto.isHomePage === true) {
+      const collection = this.documentRepository.manager
+        .getMongoRepository(DocumentEntity)
+        .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
+
+      const currentFeaturedCount = await collection.count({
+        _id: { $ne: new ObjectId(id) },
+        isHomePage: true,
+      });
+
+      if (currentFeaturedCount >= 4) {
+        throw new BadRequestException(
+          'A maximum of 4 documents can be featured on the homepage at the same time. Please unfeature another document first.',
+        );
+      }
+    }
+
     let updateData: any = { ...dto };
 
     if (file) {
@@ -778,6 +839,59 @@ export class DocumentsService {
   // ─── ADMIN: all docs ──────────────────────────────────
   async adminFindAll(filter: FilterDocumentDto) {
     return this.findAll(filter, false);
+  }
+
+  // ─── ADMIN: toggle homepage status (max 4) ───────────
+  async setHomePageStatus(
+    id: string,
+    isHomePage: boolean,
+  ): Promise<DocumentEntity> {
+    if (!ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid document ID');
+    }
+
+    const doc = await this.findById(id);
+    if (!doc) {
+      throw new NotFoundException(`Document ${id} not found`);
+    }
+
+    if (isHomePage) {
+      const collection = this.documentRepository.manager
+        .getMongoRepository(DocumentEntity)
+        .manager.connection.mongoManager.getMongoRepository(DocumentEntity);
+
+      const currentFeaturedCount = await collection.count({
+        _id: { $ne: new ObjectId(id) },
+        isHomePage: true,
+      });
+
+      if (currentFeaturedCount >= 4) {
+        throw new BadRequestException(
+          'A maximum of 4 documents can be featured on the homepage at the same time. Please unfeature another document first.',
+        );
+      }
+    }
+
+    const result = await this.documentRepository.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { isHomePage } },
+    );
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(`Document ${id} not found`);
+    }
+
+    return this.findById(id);
+  }
+
+  // ─── HOMEPAGE SHOWCASE (up to 4 featured docs) ────────
+  async findHomePage() {
+    return this.findPublic({
+      isHomePage: true,
+      limit: 4,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
   }
 
   // ─── shared cleanup logic ───

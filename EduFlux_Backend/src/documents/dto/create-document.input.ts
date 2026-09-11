@@ -100,4 +100,19 @@ export class CreateDocumentInput {
   @IsOptional()
   @IsBoolean()
   isPremiumOnly?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether this document is featured on the homepage (maximum 4 documents)',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean()
+  isHomePage?: boolean;
 }

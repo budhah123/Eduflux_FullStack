@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsNumber, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class FilterDocumentDto {
   @ApiProperty({ required: false })
@@ -27,6 +27,16 @@ export class FilterDocumentDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean()
+  isHomePage?: boolean;
 
   @ApiProperty({ required: false, default: 1 })
   @IsOptional()
