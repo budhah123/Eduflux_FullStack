@@ -172,4 +172,14 @@ export class DocumentEntity extends CommonAttribute {
   })
   @Column('string', { name: 'thumbnailUrl', nullable: true })
   thumbnailUrl?: string;
+
+  @ApiProperty({
+    description:
+      'Whether this document is displayed in the homepage showcase (maximum 4 documents)',
+    type: Boolean,
+    example: false,
+    default: false,
+  })
+  @Column('boolean', { name: 'isHomePage', default: false })
+  isHomePage: boolean = false;
 }

@@ -126,6 +126,8 @@ export default function AdminDocumentManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [queueCount, setQueueCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [homePageCount, setHomePageCount] = useState(0);
+  const [togglingHomePageId, setTogglingHomePageId] = useState(null);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,17 +221,52 @@ export default function AdminDocumentManagement() {
         setTotalPages(response.totalPages || 1);
       }
 
-      // Fetch dynamic badge count for moderation queue and total documents
+      // Fetch dynamic badge count for moderation queue, total documents, and homepage featured docs
       const queueRes = await documentApi.adminGetDocuments({ status: 'pending', limit: 1 });
       setQueueCount(queueRes.total || 0);
 
       const totalRes = await documentApi.adminGetDocuments({ limit: 1 });
       setTotalCount(totalRes.total || 0);
 
+      const homePageRes = await documentApi.adminGetDocuments({ isHomePage: true, limit: 10 });
+      setHomePageCount(homePageRes.total || 0);
+
     } catch (err) {
       showToast(err.message || 'Failed to fetch documents', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle Toggle Homepage (Popular in Your Department showcase) - Max 4 allowed
+  const handleToggleHomePage = async (doc) => {
+    const nextStatus = !doc.isHomePage;
+
+    // Prevent selecting more than 4 documents on frontend
+    if (nextStatus && homePageCount >= 4) {
+      showToast(
+        'Maximum 4 documents can be displayed on the homepage. Please unfeature another document first.',
+        'error',
+      );
+      return;
+    }
+
+    setTogglingHomePageId(doc._id);
+    try {
+      await documentApi.adminToggleHomePage(doc._id, nextStatus);
+      setDocuments((prev) =>
+        prev.map((d) => (d._id === doc._id ? { ...d, isHomePage: nextStatus } : d)),
+      );
+      setHomePageCount((prev) => (nextStatus ? prev + 1 : Math.max(0, prev - 1)));
+      showToast(
+        nextStatus
+          ? `"${doc.title}" added to homepage showcase.`
+          : `"${doc.title}" removed from homepage showcase.`,
+      );
+    } catch (err) {
+      showToast(err.message || 'Failed to update homepage status', 'error');
+    } finally {
+      setTogglingHomePageId(null);
     }
   };
 
@@ -510,16 +547,29 @@ export default function AdminDocumentManagement() {
             </button>
           </div>
           
-          {/* Action Bar Search (within layout matching top app bar aesthetics) */}
-          <div className="relative flex items-center py-2 max-w-xs w-full mr-4">
-            <span className="material-symbols-outlined absolute left-3 text-slate-400 text-sm select-none">search</span>
-            <input
-              className="pl-9 pr-4 py-1.5 border border-[#c7c4d8]/40 rounded-full text-xs w-full bg-white focus:ring-2 focus:ring-[#3525cd] focus:border-transparent outline-none transition-all"
-              placeholder="Search table..."
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          {/* Controls: Homepage counter badge & Search */}
+          <div className="flex items-center gap-3 py-2 mr-4">
+            <div
+              title="Maximum 4 documents can be displayed in the Popular in Your Department section on the homepage."
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50/90 border border-indigo-200/80 rounded-full text-xs font-semibold text-[#3525cd]"
+            >
+              <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+              <span>Homepage:</span>
+              <span className="font-bold bg-white text-[#3525cd] px-2 py-0.5 rounded-full border border-indigo-200 shadow-xs">
+                {homePageCount} / 4
+              </span>
+            </div>
+
+            <div className="relative flex items-center max-w-xs w-full">
+              <span className="material-symbols-outlined absolute left-3 text-slate-400 text-sm select-none">search</span>
+              <input
+                className="pl-9 pr-4 py-1.5 border border-[#c7c4d8]/40 rounded-full text-xs w-full bg-white focus:ring-2 focus:ring-[#3525cd] focus:border-transparent outline-none transition-all"
+                placeholder="Search table..."
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -545,6 +595,7 @@ export default function AdminDocumentManagement() {
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Downloads</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Homepage</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
@@ -591,6 +642,47 @@ export default function AdminDocumentManagement() {
                             onStatusUpdated={handleStatusUpdated}
                           />
                         </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="inline-flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(doc.isHomePage)}
+                              title={
+                                doc.isHomePage
+                                  ? 'Click to remove from homepage showcase'
+                                  : homePageCount >= 4
+                                    ? 'Homepage limit reached (4/4). Unfeature another document first.'
+                                    : 'Click to feature on homepage showcase (max 4)'
+                              }
+                              disabled={
+                                togglingHomePageId === doc._id ||
+                                (!doc.isHomePage && homePageCount >= 4)
+                              }
+                              onClick={() => handleToggleHomePage(doc)}
+                              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#3525cd] focus:ring-offset-2 disabled:cursor-not-allowed ${
+                                doc.isHomePage ? 'bg-[#3525cd]' : 'bg-slate-200'
+                              } ${!doc.isHomePage && homePageCount >= 4 ? 'opacity-50' : ''}`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  doc.isHomePage ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                            {togglingHomePageId === doc._id ? (
+                              <span className="w-3 h-3 border-2 border-[#3525cd] border-t-transparent rounded-full animate-spin" />
+                            ) : doc.isHomePage ? (
+                              <span className="text-[11px] font-bold text-[#3525cd] bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 flex items-center gap-0.5">
+                                <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                Featured
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">Off</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-right relative">
                           <button 
                             onClick={() => setActiveMenuId(activeMenuId === doc._id ? null : doc._id)}
@@ -628,7 +720,7 @@ export default function AdminDocumentManagement() {
                 ) : (
                   !loading && (
                     <tr>
-                      <td colSpan="7" className="text-center py-20 text-slate-400 text-sm">
+                      <td colSpan="8" className="text-center py-20 text-slate-400 text-sm">
                         No documents found in the database matching search filters.
                       </td>
                     </tr>
@@ -836,6 +928,12 @@ export default function AdminDocumentManagement() {
             {/* Form Fields */}
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
               
+              {/* Admin Auto-Approval Notice */}
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 flex items-center gap-2.5 text-emerald-800 text-xs font-medium">
+                <span className="material-symbols-outlined text-emerald-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                <span><strong>Admin Auto-Approval:</strong> Documents uploaded by admins are automatically approved and published live immediately without requiring review in the moderation queue.</span>
+              </div>
+
               {/* File Upload Area */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Document File *</label>

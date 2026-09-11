@@ -32,6 +32,8 @@ import {
 } from './dto';
 import { AtGuard, AdminAtGuard } from '../auth/decorator';
 import { AccessService } from '@app/access';
+import { UserType } from '../user/enum';
+import { DocumentStatus } from './enum';
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'application/pdf',
@@ -88,6 +90,12 @@ export class DocumentsController {
       limit: filter?.limit || 8,
       page: filter?.page || 1,
     });
+  }
+
+  @Get('homepage')
+  @ApiOperation({ summary: 'Featured documents for homepage showcase (max 4)' })
+  async findHomePage() {
+    return this.documentsService.findHomePage();
   }
 
   @Get('public/:id')
@@ -256,6 +264,7 @@ export class DocumentsController {
         req.user._id,
         file.mimetype,
       );
+    const isAdmin = req.user?.userType === UserType.ADMIN;
     return this.documentsService.create({
       ...body,
       fileKey,
@@ -267,6 +276,7 @@ export class DocumentsController {
       fileVersion: version,
       fileSize: file.size,
       userId: req.user._id,
+      status: isAdmin ? DocumentStatus.APPROVED : DocumentStatus.PENDING,
     } as any);
   }
 

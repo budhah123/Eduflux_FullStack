@@ -63,6 +63,11 @@ export const documentApi = {
     );
   },
 
+  // GET /documents/homepage
+  getHomePageDocuments: async () => {
+    return apiClient.get('/documents/homepage');
+  },
+
   // GET /documents
   getAllDocuments: async (filters = {}) => {
     const params = new URLSearchParams();
@@ -120,6 +125,11 @@ export const documentApi = {
   // PATCH /admin/document/:id/status
   adminChangeStatus: async (id, status) => {
     return apiClient.patch(`/admin/document/${id}/status`, { status });
+  },
+
+  // PATCH /admin/document/:id/homepage
+  adminToggleHomePage: async (id, isHomePage) => {
+    return apiClient.patch(`/admin/document/${id}/homepage`, { isHomePage });
   },
 
   // GET /admin/dashboard/stats

@@ -30,6 +30,7 @@ import {
   CreateDocumentInput,
   UpdateDocumentInput,
   UploadDocumentInput,
+  ToggleHomePageDto,
 } from 'src/documents/dto';
 import { DocumentsService } from 'src/documents/documents.service';
 import { FilterDocumentDto } from 'src/documents/dto/filter-document.dto';
@@ -112,12 +113,14 @@ export class AdminDocumentController {
     @Body() body: CreateDocumentInput,
     @Req() req,
   ) {
-      const { fileKey, fileUrl, fileFormat, resourceType, version } =
+    const adminUserId =
+      req.user?._id?.toString?.() ?? req.user?.id ?? 'system';
+    const { fileKey, fileUrl, fileFormat, resourceType, version } =
       await this.uploadService.uploadFile(
         file.buffer,
         file.originalname,
-        req.user.id,
-          file.mimetype,
+        adminUserId,
+        file.mimetype,
       );
     return this.documentService.create({
       ...body,
@@ -129,7 +132,8 @@ export class AdminDocumentController {
       resourceType,
       fileVersion: version,
       fileSize: file.size,
-      userId: req.user.id,
+      userId: adminUserId,
+      status: DocumentStatus.APPROVED,
     } as any);
   }
 
@@ -233,6 +237,55 @@ export class AdminDocumentController {
       targetId: String(existingDoc._id),
       targetName: existingDoc.title,
       details: `Admin set document status to ${dto.status}`,
+      timestamp: new Date(),
+    });
+
+    return updatedDoc;
+  }
+
+  @Patch(':id/homepage')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Admin: toggle document homepage showcase status (max 4)',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Document ID to update homepage status for',
+    example: '64b8c9f1e4b0a2d3c4e5f678',
+  })
+  @ApiBody({ type: ToggleHomePageDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Document homepage status updated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed or homepage document limit (4) exceeded',
+  })
+  async toggleHomePage(
+    @Param('id') id: string,
+    @Body() dto: ToggleHomePageDto,
+    @Req() req,
+  ) {
+    const updatedDoc = await this.documentService.setHomePageStatus(
+      id,
+      dto.isHomePage,
+    );
+    const adminUserId =
+      req.user?._id?.toString?.() ??
+      req.user?.id ??
+      req.user?.email ??
+      'system';
+
+    await this.auditLogService.logAdminAction({
+      adminUserId,
+      action: dto.isHomePage
+        ? 'featured_homepage_document'
+        : 'unfeatured_homepage_document',
+      targetType: 'document',
+      targetId: id,
+      targetName: updatedDoc.title,
+      details: `Admin set homepage featured status to ${dto.isHomePage}`,
       timestamp: new Date(),
     });
 

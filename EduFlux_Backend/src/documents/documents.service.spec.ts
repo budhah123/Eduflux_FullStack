@@ -6,10 +6,14 @@ import { FileUploadService } from '@app/file-upload';
 import { UserService } from '../user/user.service';
 import { NotificationService } from '../notification/notification.service';
 import { RatingService } from '../rating/rating.service';
+import { BadRequestException } from '@nestjs/common';
+import { DocumentStatus } from './enum';
+import { UserType } from '../user/enum';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;
   let mockFileUploadService: { getThumbnailUrl: jest.Mock };
+  let mockUserService: { getUser: jest.Mock; reconcileUploadCredits: jest.Mock };
 
   const mongoCollection = {
     find: jest.fn(),
@@ -40,6 +44,10 @@ describe('DocumentsService', () => {
     mockFileUploadService = {
       getThumbnailUrl: jest.fn(() => 'https://computed.example/thumb.jpg'),
     };
+    mockUserService = {
+      getUser: jest.fn(),
+      reconcileUploadCredits: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,9 +62,7 @@ describe('DocumentsService', () => {
         },
         {
           provide: UserService,
-          useValue: {
-            getUser: jest.fn(),
-          },
+          useValue: mockUserService,
         },
         {
           provide: NotificationService,
@@ -146,5 +152,73 @@ describe('DocumentsService', () => {
     expect(result.total).toBe(1);
     expect(mongoCollection.find).toHaveBeenCalledTimes(2);
     expect(mongoCollection.count).toHaveBeenCalledTimes(2);
+  });
+
+  it('create should auto-approve document when uploader is an admin', async () => {
+    mockUserService.getUser.mockResolvedValue({
+      _id: '507f1f77bcf86cd799439011',
+      userType: UserType.ADMIN,
+    });
+    mockDocumentRepository.create.mockImplementation((data) => ({
+      _id: 'doc-admin',
+      ...data,
+    }));
+    mockDocumentRepository.save.mockImplementation((doc) =>
+      Promise.resolve(doc),
+    );
+
+    const result = await service.create({
+      title: 'Admin Document',
+      userId: '507f1f77bcf86cd799439011',
+    });
+
+    expect(result.status).toBe(DocumentStatus.APPROVED);
+  });
+
+  it('create should leave document pending when uploader is a regular user', async () => {
+    mockUserService.getUser.mockResolvedValue({
+      _id: '507f1f77bcf86cd799439012',
+      userType: UserType.USER,
+    });
+    mockDocumentRepository.create.mockImplementation((data) => ({
+      _id: 'doc-user',
+      ...data,
+    }));
+    mockDocumentRepository.save.mockImplementation((doc) =>
+      Promise.resolve(doc),
+    );
+
+    const result = await service.create({
+      title: 'User Document',
+      userId: '507f1f77bcf86cd799439012',
+    });
+
+    expect(result.status).toBe(DocumentStatus.PENDING);
+  });
+
+  it('setHomePageStatus should allow setting isHomePage = true when fewer than 4 are featured', async () => {
+    mockDocumentRepository.findOne.mockResolvedValue({
+      _id: '507f1f77bcf86cd799439011',
+      title: 'Note 1',
+      isHomePage: false,
+    });
+    mongoCollection.count.mockResolvedValue(3);
+    mockDocumentRepository.updateOne.mockResolvedValue({ matchedCount: 1 });
+
+    const result = await service.setHomePageStatus('507f1f77bcf86cd799439011', true);
+    expect(mockDocumentRepository.updateOne).toHaveBeenCalled();
+  });
+
+  it('setHomePageStatus should reject setting isHomePage = true when 4 documents are already featured', async () => {
+    mockDocumentRepository.findOne.mockResolvedValue({
+      _id: '507f1f77bcf86cd799439011',
+      title: 'Note 1',
+      isHomePage: false,
+    });
+    mongoCollection.count.mockResolvedValue(4);
+
+    await expect(
+      service.setHomePageStatus('507f1f77bcf86cd799439011', true),
+    ).rejects.toThrow(BadRequestException);
   });
 });
