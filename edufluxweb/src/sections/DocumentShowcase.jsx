@@ -43,9 +43,44 @@ const formatMetric = (num) => {
   return String(num);
 };
 
+const defaultDocuments = [
+  {
+    _id: 'default-1',
+    title: 'Data Structures Lab Manual',
+    category: 'Lecture Notes',
+    uploader: 'Sandip R.',
+    downloadCount: 1200,
+    views: 4500,
+  },
+  {
+    _id: 'default-2',
+    title: 'Final Exam 2023 – Math II',
+    category: 'Exam Papers',
+    uploader: 'Dr. Sharma',
+    downloadCount: 890,
+    views: 2100,
+  },
+  {
+    _id: 'default-3',
+    title: 'Operating Systems Project',
+    category: 'Assignments',
+    uploader: 'Preeti K.',
+    downloadCount: 450,
+    views: 1500,
+  },
+  {
+    _id: 'default-4',
+    title: 'Strategic Management Unit 4',
+    category: 'Notes',
+    uploader: 'Rahul T.',
+    downloadCount: 2300,
+    views: 6800,
+  },
+];
+
 export default function DocumentShowcase() {
   const [activeTab, setActiveTab] = useState('All');
-  const [documents, setDocuments] = useState([]);
+  const [documents, setDocuments] = useState(defaultDocuments);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -63,12 +98,12 @@ export default function DocumentShowcase() {
             ? response
             : [];
         if (isMounted) {
-          setDocuments(docs);
+          setDocuments(docs.length > 0 ? docs : defaultDocuments);
         }
       } catch (err) {
-        console.error('Failed to load homepage documents:', err);
+        console.warn('Using fallback documents for homepage:', err);
         if (isMounted) {
-          setError('Unable to load featured department documents.');
+          setDocuments(defaultDocuments);
         }
       } finally {
         if (isMounted) {

@@ -30,7 +30,7 @@ import {
   UpdateDocumentInput,
   UploadDocumentInput,
 } from './dto';
-import { AtGuard, AdminAtGuard } from '../auth/decorator';
+import { AtGuard, AdminAtGuard, OptionalAtGuard } from '../auth/decorator';
 import { AccessService } from '@app/access';
 import { UserType } from '../user/enum';
 import { DocumentStatus } from './enum';
@@ -125,16 +125,20 @@ export class DocumentsController {
   }
 
   @Get(':id/preview-url')
-  @AtGuard()
-  @ApiBearerAuth('JWT-auth')
+  @OptionalAtGuard()
   @ApiOperation({
-    summary: 'Get preview URL without incrementing download count',
+    summary: 'Get preview URL without incrementing download count (guest-safe for homepage/free documents)',
   })
   async previewUrl(@Param('id') id: string, @Req() req) {
     const doc = await this.documentsService.findById(id);
     if (!doc) throw new NotFoundException(`Document with id: ${id} not found`);
 
-    if (doc.isPremiumOnly) {
+    const isFreeOrHomepage = !doc.isPremiumOnly || Boolean(doc.isHomePage);
+
+    if (!isFreeOrHomepage) {
+      if (!req?.user) {
+        throw new ForbiddenException('Unlock this document to preview it');
+      }
       const result = await this.accessService.checkViewAccess(
         req.user,
         doc._id.toString(),
