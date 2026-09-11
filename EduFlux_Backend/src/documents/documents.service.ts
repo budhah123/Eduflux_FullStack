@@ -130,9 +130,11 @@ export class DocumentsService {
     const { fileUrl, fileKey, resourceType, fileVersion, ...safeDoc } =
       doc || {};
 
+    const isHomepageFeatured = Boolean(doc?.isHomePage);
     return {
       ...safeDoc,
-      isLocked: Boolean(doc?.isPremiumOnly),
+      isLocked: isHomepageFeatured ? false : Boolean(doc?.isPremiumOnly),
+      isHomePage: isHomepageFeatured,
     };
   }
 
@@ -886,8 +888,21 @@ export class DocumentsService {
 
   // ─── HOMEPAGE SHOWCASE (up to 4 featured docs) ────────
   async findHomePage() {
-    return this.findPublic({
+    const featured = await this.findPublic({
       isHomePage: true,
+      limit: 4,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
+
+    // If documents are explicitly marked as isHomePage, return them
+    if (featured.data && featured.data.length > 0) {
+      return featured;
+    }
+
+    // Graceful fallback: If no documents have isHomePage=true set yet,
+    // return top approved documents so guest users always see dynamic documents on the homepage
+    return this.findPublic({
       limit: 4,
       sortBy: 'createdAt',
       sortOrder: 'desc',
